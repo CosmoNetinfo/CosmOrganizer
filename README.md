@@ -1,2 +1,32 @@
 # CosmOrganizer
-Organizzatore automatico di file per Window
+
+🗂️ **Organizzatore automatico di file per Windows**
+
+## 📥 Download
+
+**[⬇️ Scarica CosmOrganizer](https://github.com/CosmoNetinfo/CosmOrganizer/releases/latest)**
+
+## ✨ Funzionalità
+
+- 📁 Organizza file per **tipo** (Documenti, Immagini, Video, Audio)
+- 📅 Organizza per **data** di creazione o modifica
+- 📝 Organizza per **estensione**
+- 🔤 Organizza per **prima lettera**
+- 📊 Organizza per **dimensione**
+- 👁️ **Anteprima** prima di organizzare
+- ↩️ **Annulla** - ripristina i file
+- 🖱️ **Drag & drop** per aggiungere cartelle
+
+## 💻 Requisiti
+
+- Windows 10/11
+
+## 🚀 Installazione
+
+1. Scarica `CosmOrganizer_Setup.exe`
+2. Esegui l'installer
+3. Fatto!
+
+## 👨‍💻 Autore
+
+CosmoNetinfo
