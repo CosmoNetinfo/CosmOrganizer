@@ -1,33 +1,25 @@
-# CosmOrganizer
-<img width="1198" height="854" alt="Screenshot 2026-01-04 221457" src="https://github.com/user-attachments/assets/d8e4843d-81e3-4004-8a5c-54b8e3c74383" />
+# CosmOrganizer 🚀
 
-🗂️ **Organizzatore automatico di file per Windows**
+Organizzatore automatico di file per Windows – addio cartella Download incasinata! 🧹
 
-## 📥 Download
+## ⚡ Cerchiamo tester per la versione 3.2.0!
 
-**[⬇️ Scarica CosmOrganizer](https://github.com/CosmoNetinfo/CosmOrganizer/releases/latest)**
+La tua cartella Download è un caos? Proviamo insieme a sistemarla!
 
-## ✨ Funzionalità
+Scarica la versione più recente qui:  
+👉 [Release 3.2.0](https://github.com/CosmoNetinfo/CosmOrganizer/releases/tag/3.2.0)
 
-- 📁 Organizza file per **tipo** (Documenti, Immagini, Video, Audio)
-- 📅 Organizza per **data** di creazione o modifica
-- 📝 Organizza per **estensione**
-- 🔤 Organizza per **prima lettera**
-- 📊 Organizza per **dimensione**
-- 👁️ **Anteprima** prima di organizzare
-- ↩️ **Annulla** - ripristina i file
-- 🖱️ **Drag & drop** per aggiungere cartelle
+- **Portable**: CosmOrganizer_v3.2.0_Portable.zip (niente installazione)
+- **Installabile**: CosmOrganizer_v3.2.0_Setup.exe
 
-## 💻 Requisiti
+**Cosa ci serve da te:**
+- Provala sul tuo PC Windows
+- Segnala bug, crash o comportamenti strani
+- Dimmi cosa ti piace e cosa miglioreresti
 
-- Windows 10/11
+**Dove lasciare feedback?**
+- Apri una nuova **[Issue qui su GitHub](https://github.com/CosmoNetinfo/CosmOrganizer/issues/new/choose)** (è facilissimo!)
+- Oppure rispondi direttamente nei commenti della release
 
-## 🚀 Installazione
+Ogni feedback ci aiuta a renderla perfetta! ❤️ Grazie mille!
 
-1. Scarica `CosmOrganizer_Setup.exe`
-2. Esegui l'installer
-3. Fatto!
-
-## 👨‍💻 Autore
-
-CosmoNetinfo
