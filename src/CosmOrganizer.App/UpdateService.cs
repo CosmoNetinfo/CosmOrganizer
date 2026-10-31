@@ -31,19 +31,50 @@ namespace CosmOrganizer
                 _updateManager = null;
             }
 
-            // Check every 6 hours (6 * 3600 * 1000 ms)
+            // Check every 6 hours
             _timer = new System.Threading.Timer(async _ => await CheckAndDownloadAsync(), null, Timeout.Infinite, Timeout.Infinite);
         }
 
         public void Start()
         {
-            // Initial check delayed by 5 seconds so app UI loads first
             _ = Task.Run(async () =>
             {
                 await Task.Delay(5000);
                 await CheckAndDownloadAsync();
                 _timer.Change(TimeSpan.FromHours(6), TimeSpan.FromHours(6));
             });
+        }
+
+        public async Task<string> CheckForUpdatesManualAsync()
+        {
+            if (_updateManager == null || !_updateManager.IsInstalled)
+                return "Modalità sviluppo: Velopack attivo solo su installazioni ufficiali.";
+
+            if (_isChecking)
+                return "Controllo aggiornamenti già in corso...";
+
+            try
+            {
+                _isChecking = true;
+                var updateInfo = await _updateManager.CheckForUpdatesAsync();
+                if (updateInfo == null)
+                    return "Nessun aggiornamento disponibile: hai già l'ultima versione.";
+
+                await _updateManager.DownloadUpdatesAsync(updateInfo);
+                _downloadedUpdate = updateInfo;
+
+                string targetVersion = updateInfo.TargetFullRelease?.Version?.ToString() ?? "nuovo";
+                _onUpdateReady(targetVersion);
+                return $"Aggiornamento {targetVersion} scaricato! Riavvia per applicarlo.";
+            }
+            catch (Exception ex)
+            {
+                return $"Impossibile verificare gli aggiornamenti: {ex.Message}";
+            }
+            finally
+            {
+                _isChecking = false;
+            }
         }
 
         public async Task CheckAndDownloadAsync()
@@ -67,7 +98,6 @@ namespace CosmOrganizer
                 await _updateManager.DownloadUpdatesAsync(updateInfo);
                 _downloadedUpdate = updateInfo;
 
-                // Notify UI: "Aggiornamento {version} pronto — Riavvia per installare"
                 string targetVersion = updateInfo.TargetFullRelease?.Version?.ToString() ?? "nuovo";
                 _onUpdateReady(targetVersion);
             }

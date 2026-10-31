@@ -1,4 +1,4 @@
-// CosmOrganizer Interface Client Script
+﻿// CosmOrganizer Interface Client Script
 // © CosmoNet.info — MIT License
 
 let currentLang = 'it';
@@ -623,6 +623,21 @@ function handleMessage(msg) {
         case 'toast':
             alert(payload);
             break;
+        case 'updateCheckResult':
+            const updateResEl = document.getElementById('updateCheckResult');
+            if (updateResEl) updateResEl.textContent = payload;
+            break;
+        case 'appVersion':
+            setAppVersion(payload);
+            break;
+    }
+}
+
+function checkUpdatesManual() {
+    const resEl = document.getElementById('updateCheckResult');
+    if (resEl) resEl.textContent = 'Controllo in corso...';
+    if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage('checkUpdates');
     }
 }
 
