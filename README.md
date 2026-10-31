@@ -11,9 +11,11 @@
 Scarica sempre l'ultima versione stabile tramite i link ufficiali diretti:
 
 - 📦 **Installer con Auto-Aggiornamenti (consigliato):**  
-  👉 [CosmOrganizer-Setup.exe](https://github.com/CosmoNetinfo/CosmOrganizer/releases/latest/download/CosmOrganizer-Setup.exe)
+  👉 [CosmOrganizer-win-Setup.exe](https://github.com/CosmoNetinfo/CosmOrganizer/releases/latest/download/CosmOrganizer-win-Setup.exe)
 - 🧰 **Versione Portable (senza installazione):**  
-  👉 [CosmOrganizer-Portable.zip](https://github.com/CosmoNetinfo/CosmOrganizer/releases/latest/download/CosmOrganizer-Portable.zip)
+  👉 [CosmOrganizer-win-Portable.zip](https://github.com/CosmoNetinfo/CosmOrganizer/releases/latest/download/CosmOrganizer-win-Portable.zip)
+- 📋 **Tutte le versioni e note di rilascio:**  
+  👉 [Releases su GitHub](https://github.com/CosmoNetinfo/CosmOrganizer/releases)
 
 ### Requisiti di sistema
 - **Windows 10 / Windows 11 (64-bit)**
