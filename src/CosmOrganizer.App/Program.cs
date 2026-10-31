@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Media;
-using System.Net.Http;
 using System.Diagnostics;
 using Microsoft.Win32;
 using System.Text.Json;
@@ -16,6 +15,8 @@ using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using Velopack;
+using CosmOrganizer.Core;
+using CosmOrganizer.Core;
 
 namespace CosmOrganizer
 {
@@ -23,28 +24,6 @@ namespace CosmOrganizer
     {
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
-
-        [DllImport("Gdi32.dll", EntryPoint = "CreateRoundRectRgn")]
-        private static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
-
-        private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
-        private const int DWMWCP_ROUND = 2;
-
-        private void ApplyRoundedCorners()
-        {
-            try
-            {
-                // Set Region for actual clipping
-                // Using 12px radius (diameter 24)
-                int r = 24;
-                this.Region = System.Drawing.Region.FromHrgn(CreateRoundRectRgn(0, 0, Width + 1, Height + 1, r, r));
-
-                // Win11 native rounding attribute
-                int attribute = DWMWCP_ROUND;
-                DwmSetWindowAttribute(this.Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref attribute, sizeof(int));
-            }
-            catch { }
-        }
 
         private WebView2 webView;
         private ListBox lstSourceFolders;
@@ -58,79 +37,56 @@ namespace CosmOrganizer
         private System.Windows.Forms.Timer scheduleTimer;
         private PictureBox picLogo;
         private Panel headerPanel;
-        
+
         private List<string> excludedExtensions = new List<string>();
         private List<string> excludedFolders = new List<string>();
         private long minFileSize = 0, maxFileSize = long.MaxValue;
         private bool isScheduleEnabled = false, scheduleDaily = false, isDarkMode = true;
         private DateTime scheduledTime;
-        private List<FileOperation> operationHistory = new List<FileOperation>();
         private List<object> sessionMoved = new List<object>();
         private List<string> sessionDeleted = new List<string>();
         private System.Threading.CancellationTokenSource cancellationTokenSource;
         private Dictionary<string, Dictionary<string, string>> translations;
         private string currentLanguage = "it";
         private UpdateService updateService;
-        
+
         // Real-time Monitoring
         private CheckBox chkRealTime;
         private bool isRealTimeEnabled = false;
-        private List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
-        
-        private AppSettings settings = new AppSettings();
 
-        private class FileOperation { public string SourcePath, DestPath; public bool WasCopied; }
+        // --- Core services ---
+        private readonly SafeFileService _safeFile = new();
+        private readonly SettingsService _settingsService = new();
+        private readonly JournalService _journal = new();
+        private RealTimeService? _realTime;
+        private string _currentRunId = string.Empty;
+        private readonly HashSet<string> _dirsEmptiedThisRun = new();
+        // Core settings (replaces the old internal AppSettings)
+        private CosmOrganizer.Core.AppSettings _coreSettings = new();
+        private bool _showCorruptedWarning;
 
-        public class AppSettings
-        {
-            public bool IsDarkMode { get; set; } = true;
-            public string Language { get; set; } = "it";
-            public bool ScheduleEnabled { get; set; }
-            public DateTime ScheduledTime { get; set; }
-            public bool ScheduleDaily { get; set; }
-            public List<string> ExcludedExtensions { get; set; } = new List<string>();
-            public List<string> ExcludedFolders { get; set; } = new List<string>();
-            public List<string> SourceFolders { get; set; } = new List<string>();
-            public long MinFileSize { get; set; } = 0;
-            public long MaxFileSize { get; set; } = long.MaxValue;
-            public bool RealTimeEnabled { get; set; }
-            public bool DeleteEmptyFolders { get; set; }
-            public bool CompressOldFiles { get; set; }
-            public bool IncludeSubfolders { get; set; } = false; // Default false
-            public int CompressDays { get; set; } = 90;
-            public long MinCompressSize { get; set; } = 10485760; // Default 10MB
-            public bool AutoUpdateEnabled { get; set; } = true;
-            
-            // Statistics
-            public long TotalFilesOrganized { get; set; }
-            public long TotalFilesCompressed { get; set; }
-            public long TotalFilesDeleted { get; set; }
-            public long TotalSpaceSavedMB { get; set; }
-            public DateTime StatsSince { get; set; } = DateTime.Now;
-            
-            // UI State
-            public string LastDestinationFolder { get; set; }
-        }
-        
         public CosmOrganizerForm()
         {
             // Imposta dimensioni finestra
             this.Size = new System.Drawing.Size(1200, 850);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new System.Drawing.Size(1000, 750);
-            
+
             InitializeTranslations();
             LoadSettings();
-            
+
             // Modern UI Initialization
             InitializeWebView();
-            
-            this.Resize += (s, e) => ApplyRoundedCorners();
-            
+
             // Auto Update Service via Velopack
-            updateService = new UpdateService(() => settings.AutoUpdateEnabled, OnUpdateReady);
+            updateService = new UpdateService(() => _coreSettings.AutoUpdateEnabled, OnUpdateReady);
             updateService.Start();
-            this.FormClosing += (s, e) => updateService.ApplyOnShutdown();
+
+            this.FormClosing += (s, e) =>
+            {
+                _realTime?.Dispose();
+                updateService?.ApplyOnShutdown();
+            };
         }
 
         private void OnUpdateReady(string newVersion)
@@ -145,7 +101,13 @@ namespace CosmOrganizer
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            ApplyRoundedCorners();
+            try
+            {
+                const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+                int darkMode = 1;
+                DwmSetWindowAttribute(this.Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
+            }
+            catch { }
         }
 
         private void CosmOrganizerForm_KeyDown(object sender, KeyEventArgs e)
@@ -153,14 +115,14 @@ namespace CosmOrganizer
             // Legacy keyboard shortcuts disabled for WebView UI
             // Can be re-enabled with appropriate WebView message passing
         }
-        
+
         public void AddFolderFromArgs(string folderPath)
         {
             this.Load += (s, e) =>
             {
-                if (!settings.SourceFolders.Contains(folderPath))
+                if (!_coreSettings.SourceFolders.Contains(folderPath))
                 {
-                    settings.SourceFolders.Add(folderPath);
+                    _coreSettings.SourceFolders.Add(folderPath);
                     SaveSettings();
                     RefreshFileCount();
                     UpdateWatchers();
@@ -168,13 +130,13 @@ namespace CosmOrganizer
                 }
             };
         }
-        
+
         private void PlayCompletionSound()
         {
             try { SystemSounds.Asterisk.Play(); }
             catch { }
         }
-        
+
         private void InitializeTranslations()
         {
             translations = new Dictionary<string, Dictionary<string, string>>
@@ -241,23 +203,23 @@ namespace CosmOrganizer
                 }
             };
         }
-        
-        private string T(string k) => translations.ContainsKey(settings.Language) && translations[settings.Language].ContainsKey(k) ? translations[settings.Language][k] : k;
-        
+
+        private string T(string k) => translations.ContainsKey(currentLanguage) && translations[currentLanguage].ContainsKey(k) ? translations[currentLanguage][k] : k;
+
         private async void InitializeWebView()
         {
-            // Borderless Modern Window Setup
+            // Modern Window Setup
             Text = "CosmOrganizer";
-            FormBorderStyle = FormBorderStyle.None; // Remove default Windows borders
+            FormBorderStyle = FormBorderStyle.Sizable;
             BackColor = Color.FromArgb(5, 7, 10); // Match CSS --bg-dark
-            
+
             // WebView Setup
             webView = new WebView2();
             webView.Dock = DockStyle.Fill;
             webView.AllowExternalDrop = true; // Allow dropping files from Explorer
             Controls.Add(webView);
-            
-            try 
+
+            try
             {
                 var userFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CosmOrganizer", "WebView2");
                 if (!Directory.Exists(userFolder)) Directory.CreateDirectory(userFolder);
@@ -269,25 +231,25 @@ namespace CosmOrganizer
                 MessageBox.Show($"Errore inizializzazione UI: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-            
+
             string htmlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Interface", "index.html");
-            
+
             // Debug: Show the path and check if file exists
             System.Diagnostics.Debug.WriteLine($"Loading HTML from: {htmlPath}");
             System.Diagnostics.Debug.WriteLine($"File exists: {File.Exists(htmlPath)}");
             System.Diagnostics.Debug.WriteLine($"Base directory: {AppDomain.CurrentDomain.BaseDirectory}");
-            
+
             if (!File.Exists(htmlPath))
             {
-                MessageBox.Show($"File HTML non trovato!\n\nPercorso cercato:\n{htmlPath}\n\nBase directory:\n{AppDomain.CurrentDomain.BaseDirectory}", 
+                MessageBox.Show($"File HTML non trovato!\n\nPercorso cercato:\n{htmlPath}\n\nBase directory:\n{AppDomain.CurrentDomain.BaseDirectory}",
                     "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-            
+
             // Load HTML with proper file:// URI
             var uri = new Uri(htmlPath);
             webView.Source = uri;
-            
+
             // Event Handlers
             webView.WebMessageReceived += WebView_WebMessageReceived;
             webView.NavigationCompleted += (s, e) =>
@@ -297,22 +259,22 @@ namespace CosmOrganizer
                 string verStr = ver != null ? $"{ver.Major}.{ver.Minor}" : "3.3";
                 webView.ExecuteScriptAsync($"setAppVersion('{verStr}');");
             };
-            
+
             // Native Drag & Drop Implementation
-            webView.DragEnter += (s, e) => 
-            { 
-                if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; 
+            webView.DragEnter += (s, e) =>
+            {
+                if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy;
             };
-            webView.DragDrop += (s, e) => 
+            webView.DragDrop += (s, e) =>
             {
                 if (e.Data.GetDataPresent(DataFormats.FileDrop))
                 {
                     string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
                     foreach (string path in files)
                     {
-                        if (Directory.Exists(path) && !settings.SourceFolders.Contains(path))
+                        if (Directory.Exists(path) && !_coreSettings.SourceFolders.Contains(path))
                         {
-                            settings.SourceFolders.Add(path);
+                            _coreSettings.SourceFolders.Add(path);
                             SaveSettings();
                             // Notify UI of success (Visual feedback)
                             if (webView != null && webView.CoreWebView2 != null)
@@ -331,7 +293,7 @@ namespace CosmOrganizer
         private void UpdateSourceUI()
         {
             if (webView == null || webView.CoreWebView2 == null) return;
-            var list = string.Join(", ", settings.SourceFolders.Select(p => Path.GetFileName(p)));
+            var list = string.Join(", ", _coreSettings.SourceFolders.Select(p => Path.GetFileName(p)));
             if (string.IsNullOrEmpty(list)) list = "Trascina qui le cartelle";
             webView.ExecuteScriptAsync($"if(document.querySelector('#dropZone h3')) document.querySelector('#dropZone h3').innerText = '{list.Replace("'", "\\'")}';");
         }
@@ -339,26 +301,21 @@ namespace CosmOrganizer
         private void UpdateUIStats()
         {
             if (webView == null || webView.IsDisposed) return;
-            
+
             Invoke(new Action(async () => {
                 if (webView.CoreWebView2 == null) return;
 
-                // Calculate Stats
-                long fileCount = settings.TotalFilesOrganized;
-                long deletedCount = settings.TotalFilesDeleted;
-                string spaceSaved = (settings.TotalSpaceSavedMB < 1024) 
-                    ? $"{settings.TotalSpaceSavedMB:F1} MB" 
-                    : $"{(settings.TotalSpaceSavedMB/1024f):F2} GB";
-                bool isMon = settings.RealTimeEnabled;
-                string dest = string.IsNullOrEmpty(settings.LastDestinationFolder) ? "Non selezionata" : settings.LastDestinationFolder;
+                bool isMon = isRealTimeEnabled;
+                string dest = string.IsNullOrEmpty(_coreSettings.LastDestinationFolder) ? "Non selezionata" : _coreSettings.LastDestinationFolder;
 
                 var js = $@"
-                    if(typeof updateStats === 'function') updateStats({fileCount}, '{spaceSaved}', {isMon.ToString().ToLower()}, {deletedCount});
+                    if(typeof updateStats === 'function') updateStats(0, '0 MB', {isMon.ToString().ToLower()}, 0);
                     if(document.getElementById('destPath')) document.getElementById('destPath').innerText = '{dest.Replace("\\", "\\\\")}';
                 ";
                 await webView.ExecuteScriptAsync(js);
             }));
         }
+
         private async void LoadInitialData()
         {
             if (webView == null || webView.CoreWebView2 == null) return;
@@ -374,12 +331,23 @@ namespace CosmOrganizer
                         const chkDelete = document.getElementById('chkDeleteEmpty');
                         const chkCompress = document.getElementById('chkCompress');
                         const chkSub = document.getElementById('chkSubfolders');
-                        if (chkDelete) chkDelete.checked = {settings.DeleteEmptyFolders.ToString().ToLower()};
-                        if (chkCompress) chkCompress.checked = {settings.CompressOldFiles.ToString().ToLower()};
-                        if (chkSub) chkSub.checked = {settings.IncludeSubfolders.ToString().ToLower()};
+                        if (chkDelete) chkDelete.checked = {_coreSettings.DeleteEmptyFolders.ToString().ToLower()};
+                        if (chkCompress) chkCompress.checked = {_coreSettings.CompressOldFiles.ToString().ToLower()};
+                        if (chkSub) chkSub.checked = {_coreSettings.IncludeSubfolders.ToString().ToLower()};
                     }}, 100);
                 ";
                 await webView.ExecuteScriptAsync(jsCode);
+
+                // Read registry to show real startup toggle state
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run");
+                bool startupEnabled = key?.GetValue("CosmOrganizer") != null;
+                await webView.ExecuteScriptAsync($"setTimeout(() => {{ const chkStartup = document.getElementById('chkStartup'); if(chkStartup) chkStartup.checked = {startupEnabled.ToString().ToLower()}; }}, 150);");
+
+                if (_showCorruptedWarning)
+                {
+                    _showCorruptedWarning = false;
+                    await PostMessage("toast", "⚠️ Impostazioni danneggiate: ripristinati i valori predefiniti.");
+                }
 
                 // Initial log
                 await webView.ExecuteScriptAsync("addLog('Sistema inizializzato ✓');");
@@ -396,7 +364,7 @@ namespace CosmOrganizer
         {
             try {
                 var msg = e.TryGetWebMessageAsString();
-                
+
                 if (msg == "pageReady")
                 {
                     // JavaScript is ready, now load initial data
@@ -412,13 +380,13 @@ namespace CosmOrganizer
                 else if (msg.StartsWith("set:deleteEmpty:"))
                 {
                     var val = msg.Substring("set:deleteEmpty:".Length);
-                    settings.DeleteEmptyFolders = val == "true";
+                    _coreSettings.DeleteEmptyFolders = val == "true";
                     SaveSettings();
                 }
                 else if (msg.StartsWith("set:compress:"))
                 {
                     var val = msg.Substring("set:compress:".Length);
-                    settings.CompressOldFiles = val == "true";
+                    _coreSettings.CompressOldFiles = val == "true";
                     SaveSettings();
                 }
                 else if (msg.StartsWith("set:startup:"))
@@ -433,7 +401,7 @@ namespace CosmOrganizer
                 else if (msg.StartsWith("set:includeSub:"))
                 {
                     var val = msg.Substring("set:includeSub:".Length);
-                    settings.IncludeSubfolders = val == "true";
+                    _coreSettings.IncludeSubfolders = val == "true";
                     SaveSettings();
                     UpdateWatchers(); // Refresh watchers to apply subfolder setting
                 }
@@ -462,9 +430,9 @@ namespace CosmOrganizer
                        {
                            if (d.ShowDialog() == DialogResult.OK)
                            {
-                               if (!settings.SourceFolders.Contains(d.SelectedPath)) 
+                               if (!_coreSettings.SourceFolders.Contains(d.SelectedPath))
                                {
-                                   settings.SourceFolders.Add(d.SelectedPath);
+                                   _coreSettings.SourceFolders.Add(d.SelectedPath);
                                    SaveSettings();
                                    RefreshFileCount();
                                    UpdateSourceUI();
@@ -483,7 +451,7 @@ namespace CosmOrganizer
                            d.Description = "Seleziona dove salvare i file organizzati";
                            if (d.ShowDialog() == DialogResult.OK)
                            {
-                               settings.LastDestinationFolder = d.SelectedPath;
+                               _coreSettings.LastDestinationFolder = d.SelectedPath;
                                SaveSettings();
                                UpdateUIStats();
                            }
@@ -504,7 +472,7 @@ namespace CosmOrganizer
                     }
                     catch { }
                 }
-                
+
             } catch {}
         }
 
@@ -527,29 +495,27 @@ namespace CosmOrganizer
             catch { }
         }
 
-
         private void ToggleRealTimeMonitoring()
         {
-            settings.RealTimeEnabled = !settings.RealTimeEnabled;
-            isRealTimeEnabled = settings.RealTimeEnabled;
+            isRealTimeEnabled = !isRealTimeEnabled;
             SaveSettings();
             UpdateWatchers();
-            Log(settings.RealTimeEnabled ? "Monitoraggio Attivato ⚡" : "Monitoraggio Disattivato");
+            Log(isRealTimeEnabled ? "Monitoraggio Attivato ⚡" : "Monitoraggio Disattivato");
         }
 
         private void InitializeUI()
         {
             // Legacy UI initialization is suppressed in favor of InitializeWebView
         }
-        
+
         private void ApplyTheme()
         {
-            if (settings.IsDarkMode)
+            if (isDarkMode)
             {
                 BackColor = Color.FromArgb(26, 29, 41);
-                headerPanel.BackColor = Color.FromArgb(36, 40, 55);
+                if (headerPanel != null) headerPanel.BackColor = Color.FromArgb(36, 40, 55);
                 ForeColor = Color.FromArgb(248, 250, 252);
-                
+
                 foreach (Control c in Controls)
                 {
                     if (c is Label) c.ForeColor = Color.FromArgb(248, 250, 252);
@@ -558,22 +524,19 @@ namespace CosmOrganizer
                     if (c is CheckBox) c.ForeColor = Color.FromArgb(248, 250, 252);
                     if (c is ComboBox) { c.BackColor = Color.FromArgb(26, 29, 41); c.ForeColor = Color.FromArgb(248, 250, 252); }
                 }
-                
-                txtLog.BackColor = Color.FromArgb(15, 15, 20);
-                txtLog.ForeColor = Color.FromArgb(16, 185, 129);
-                
-                foreach (Control c in headerPanel.Controls)
+
+                if (txtLog != null)
                 {
-                    if (c is Label) c.ForeColor = Color.FromArgb(248, 250, 252);
-                    if (c is CheckBox) c.ForeColor = Color.FromArgb(248, 250, 252);
+                    txtLog.BackColor = Color.FromArgb(15, 15, 20);
+                    txtLog.ForeColor = Color.FromArgb(16, 185, 129);
                 }
             }
             else
             {
                 BackColor = Color.FromArgb(248, 250, 252);
-                headerPanel.BackColor = Color.White;
+                if (headerPanel != null) headerPanel.BackColor = Color.White;
                 ForeColor = Color.FromArgb(30, 41, 59);
-                
+
                 foreach (Control c in Controls)
                 {
                     if (c is Label) c.ForeColor = Color.FromArgb(30, 41, 59);
@@ -582,22 +545,19 @@ namespace CosmOrganizer
                     if (c is CheckBox) c.ForeColor = Color.FromArgb(30, 41, 59);
                     if (c is ComboBox) { c.BackColor = Color.White; c.ForeColor = Color.FromArgb(30, 41, 59); }
                 }
-                
-                txtLog.BackColor = Color.FromArgb(30, 41, 59);
-                txtLog.ForeColor = Color.FromArgb(16, 185, 129);
-                
-                foreach (Control c in headerPanel.Controls)
+
+                if (txtLog != null)
                 {
-                    if (c is Label) c.ForeColor = Color.FromArgb(30, 41, 59);
-                    if (c is CheckBox) c.ForeColor = Color.FromArgb(30, 41, 59);
+                    txtLog.BackColor = Color.FromArgb(30, 41, 59);
+                    txtLog.ForeColor = Color.FromArgb(16, 185, 129);
                 }
             }
         }
-        
+
         private async void RefreshFileCount()
         {
             if (webView == null || webView.IsDisposed) return;
-            
+
             await Task.Run(() =>
             {
                 var files = GetFiles();
@@ -609,29 +569,34 @@ namespace CosmOrganizer
                 }));
             });
         }
-        
+
         private List<string> GetFiles()
         {
             var f = new List<string>();
-            foreach (string d in settings.SourceFolders)
+            foreach (string d in _coreSettings.SourceFolders)
             {
-                if (!Directory.Exists(d)) 
+                if (!Directory.Exists(d))
                 {
                     Log($"Cartella non trovata: {d}");
                     continue;
                 }
                 try
                 {
-                    var opts = settings.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly; 
+                    var opts = new EnumerationOptions
+                    {
+                        IgnoreInaccessible = true,
+                        RecurseSubdirectories = _coreSettings.IncludeSubfolders,
+                        AttributesToSkip = FileAttributes.ReparsePoint
+                    };
                     var found = Directory.GetFiles(d, "*.*", opts);
                     if (found.Length == 0) Log($"Nessun file trovato in: {d}");
-                    
+
                     foreach (var file in found)
                     {
                         var fi = new FileInfo(file);
-                        if (settings.ExcludedExtensions.Contains(fi.Extension.ToLower())) continue;
-                        if (settings.ExcludedFolders.Any(ef => file.Contains(ef))) continue;
-                        if (fi.Length < settings.MinFileSize || fi.Length > settings.MaxFileSize) continue;
+                        if (excludedExtensions.Contains(fi.Extension.ToLower())) continue;
+                        if (excludedFolders.Any(ef => file.Contains(ef))) continue;
+                        if (fi.Length < minFileSize || fi.Length > maxFileSize) continue;
                         f.Add(file);
                     }
                 }
@@ -642,120 +607,100 @@ namespace CosmOrganizer
             }
             return f;
         }
-        
+
         private void BtnFilters_Click(object s, EventArgs e)
         {
             using (var dlg = new Form { Text = T("filterTitle"), Size = new Size(450, 350), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false })
             {
                 var lblExt = new Label { Text = T("excludeExt"), Location = new Point(15, 15), AutoSize = true };
-                var txtExt = new TextBox { Location = new Point(15, 40), Size = new Size(400, 25), Text = string.Join(", ", settings.ExcludedExtensions) };
+                var txtExt = new TextBox { Location = new Point(15, 40), Size = new Size(400, 25), Text = string.Join(", ", excludedExtensions) };
                 var lblDir = new Label { Text = T("excludeDir"), Location = new Point(15, 80), AutoSize = true };
-                var txtDir = new TextBox { Location = new Point(15, 105), Size = new Size(400, 25), Text = string.Join(", ", settings.ExcludedFolders) };
+                var txtDir = new TextBox { Location = new Point(15, 105), Size = new Size(400, 25), Text = string.Join(", ", excludedFolders) };
                 var lblMin = new Label { Text = T("minSize"), Location = new Point(15, 145), AutoSize = true };
-                var numMin = new NumericUpDown { Location = new Point(15, 170), Size = new Size(180, 25), Maximum = 10000, Value = (decimal)(settings.MinFileSize / 1048576) };
+                var numMin = new NumericUpDown { Location = new Point(15, 170), Size = new Size(180, 25), Maximum = 10000, Value = (decimal)(minFileSize / 1048576) };
                 var lblMax = new Label { Text = T("maxSize"), Location = new Point(235, 145), AutoSize = true };
-                var numMax = new NumericUpDown { Location = new Point(235, 170), Size = new Size(180, 25), Maximum = 100000, Value = settings.MaxFileSize == long.MaxValue ? 0 : (decimal)(settings.MaxFileSize / 1048576) };
-                
+                var numMax = new NumericUpDown { Location = new Point(235, 170), Size = new Size(180, 25), Maximum = 100000, Value = maxFileSize == long.MaxValue ? 0 : (decimal)(maxFileSize / 1048576) };
+
                 var btnSave = new Button { Text = T("save"), Location = new Point(150, 230), Size = new Size(130, 40), FlatStyle = FlatStyle.Flat };
                 btnSave.Click += (ss, ee) =>
                 {
-                    settings.ExcludedExtensions = txtExt.Text.Split(',').Select(x => x.Trim().ToLower()).Where(x => !string.IsNullOrEmpty(x)).ToList();
-                    settings.ExcludedFolders = txtDir.Text.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x)).ToList();
-                    settings.MinFileSize = (long)(numMin.Value * 1048576);
-                    settings.MaxFileSize = numMax.Value == 0 ? long.MaxValue : (long)(numMax.Value * 1048576);
+                    excludedExtensions = txtExt.Text.Split(',').Select(x => x.Trim().ToLower()).Where(x => !string.IsNullOrEmpty(x)).ToList();
+                    excludedFolders = txtDir.Text.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x)).ToList();
+                    minFileSize = (long)(numMin.Value * 1048576);
+                    maxFileSize = numMax.Value == 0 ? long.MaxValue : (long)(numMax.Value * 1048576);
                     SaveSettings();
                     dlg.Close();
                 };
-                
+
                 dlg.Controls.AddRange(new Control[] { lblExt, txtExt, lblDir, txtDir, lblMin, numMin, lblMax, numMax, btnSave });
                 dlg.ShowDialog();
             }
         }
-        
+
         private void BtnSchedule_Click(object s, EventArgs e)
         {
             using (var dlg = new Form { Text = T("schedTitle"), Size = new Size(400, 280), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false })
             {
-                var chkEnable = new CheckBox { Text = T("schedEnable"), Location = new Point(15, 20), AutoSize = true, Checked = settings.ScheduleEnabled };
+                var chkEnable = new CheckBox { Text = T("schedEnable"), Location = new Point(15, 20), AutoSize = true, Checked = isScheduleEnabled };
                 var lblTime = new Label { Text = T("schedTime"), Location = new Point(15, 60), AutoSize = true };
-                var dtpTime = new DateTimePicker { Location = new Point(15, 85), Size = new Size(350, 25), Format = DateTimePickerFormat.Time, ShowUpDown = true, Value = settings.ScheduledTime == DateTime.MinValue ? DateTime.Now : settings.ScheduledTime };
-                var chkDaily = new CheckBox { Text = T("schedDaily"), Location = new Point(15, 125), AutoSize = true, Checked = settings.ScheduleDaily };
-                
+                var dtpTime = new DateTimePicker { Location = new Point(15, 85), Size = new Size(350, 25), Format = DateTimePickerFormat.Time, ShowUpDown = true, Value = scheduledTime == DateTime.MinValue ? DateTime.Now : scheduledTime };
+                var chkDaily = new CheckBox { Text = T("schedDaily"), Location = new Point(15, 125), AutoSize = true, Checked = scheduleDaily };
+
                 var btnSave = new Button { Text = T("save"), Location = new Point(120, 170), Size = new Size(130, 40), FlatStyle = FlatStyle.Flat };
                 btnSave.Click += (ss, ee) =>
                 {
-                    settings.ScheduleEnabled = chkEnable.Checked;
-                    settings.ScheduledTime = dtpTime.Value;
-                    settings.ScheduleDaily = chkDaily.Checked;
+                    isScheduleEnabled = chkEnable.Checked;
+                    scheduledTime = dtpTime.Value;
+                    scheduleDaily = chkDaily.Checked;
                     SaveSettings();
                     dlg.Close();
                 };
-                
+
                 dlg.Controls.AddRange(new Control[] { chkEnable, lblTime, dtpTime, chkDaily, btnSave });
                 dlg.ShowDialog();
             }
         }
-        
 
-        private void SaveSettings()
-        {
-            try
-            {
-                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CosmOrganizer_v3.json"), json);
-            }
-            catch { }
-        }
-        
         private void LoadSettings()
         {
             try
             {
-                var cfg = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CosmOrganizer_v3.json");
-                if (File.Exists(cfg))
+                var (s, corrupted) = _settingsService.Load();
+                _coreSettings = s;
+                if (corrupted)
                 {
-                    settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(cfg));
-                    if (settings.SourceFolders == null) settings.SourceFolders = new List<string>();
-                }
-                else
-                {
-                    // Migrazione vecchie settings se esistono
-                    var oldCfg = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CosmOrganizer.cfg");
-                    if (File.Exists(oldCfg)) {
-                         var p = File.ReadAllText(oldCfg).Split('|');
-                         if (p.Length >= 5) {
-                            settings.IsDarkMode = bool.Parse(p[0]);
-                            settings.Language = p[1];
-                            settings.ScheduleEnabled = bool.Parse(p[2]);
-                            settings.ScheduledTime = DateTime.Parse(p[3]);
-                            settings.ScheduleDaily = bool.Parse(p[4]);
-                            if (p.Length > 5) settings.ExcludedExtensions = p[5].Split(',').Where(x => !string.IsNullOrEmpty(x)).ToList();
-                            if (p.Length > 6) settings.ExcludedFolders = p[6].Split(',').Where(x => !string.IsNullOrEmpty(x)).ToList();
-                            if (p.Length > 7) settings.MinFileSize = long.Parse(p[7]);
-                            if (p.Length > 8) settings.MaxFileSize = long.Parse(p[8]);
-                            if (p.Length > 9) settings.RealTimeEnabled = bool.Parse(p[9]);
-                         }
-                    }
+                    // Show toast on next WebView ready
+                    _showCorruptedWarning = true;
                 }
                 UpdateWatchers();
             }
-            catch { settings = new AppSettings(); }
+            catch { _coreSettings = new(); }
         }
-        
+
+        private void SaveSettings()
+        {
+            try { _settingsService.Save(_coreSettings); }
+            catch { }
+        }
+
         private string GetCategory(string f)
         {
-            var e = Path.GetExtension(f).ToLower(); 
-            
+            var e = Path.GetExtension(f).ToLower();
+
             string[] imgs = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp", ".ico", ".tiff", ".raw", ".heic", ".psd" };
             string[] vids = { ".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".3gp" };
             string[] arch = { ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".iso", ".dmg" };
             string[] apps = { ".exe", ".msi", ".bat", ".cmd", ".sh", ".app", ".deb", ".rpm" };
+            string[] audio = { ".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a" };
+            string[] docs  = { ".pdf", ".doc", ".docx", ".odt", ".rtf", ".txt", ".md" };
 
-            if (imgs.Contains(e)) return "Immagini"; 
-            if (vids.Contains(e)) return "Video"; 
-            if (arch.Contains(e)) return "Compressi"; 
-            if (apps.Contains(e)) return "Applicazioni"; 
-            return "Miscellanea"; 
+            if (imgs.Contains(e)) return "Immagini";
+            if (vids.Contains(e)) return "Video";
+            if (arch.Contains(e)) return "Compressi";
+            if (apps.Contains(e)) return "Applicazioni";
+            if (audio.Contains(e)) return "Audio";
+            if (docs.Contains(e)) return "Documenti";
+            return "Miscellanea";
         }
 
         private bool AreFilesIdentical(string path1, string path2)
@@ -787,31 +732,35 @@ namespace CosmOrganizer
             }
             catch { return false; }
         }
-        
-        private async void PreviewFiles() 
-        { 
-            if (settings.SourceFolders.Count == 0) return; 
-            
+
+        private async void PreviewFiles()
+        {
+            if (_coreSettings.SourceFolders.Count == 0) return;
+
             // Log via WebView
             await webView.ExecuteScriptAsync("addLog('=== ANTEPRIMA ===');");
-            
-            var files = await Task.Run(() => GetFiles()); 
-            var grp = files.GroupBy(GetCategory).OrderByDescending(g => g.Count()); 
-            
+
+            var files = await Task.Run(() => GetFiles());
+            var grp = files.GroupBy(GetCategory).OrderByDescending(g => g.Count());
+
             foreach (var g in grp)
             {
                await webView.ExecuteScriptAsync($"addLog('  {g.Key}: {g.Count()}');");
             }
              await webView.ExecuteScriptAsync($"addLog('Totale: {files.Count} file');");
         }
-        
+
         private async void OrganizeFiles()
         {
             Log("🚀 Avvio Ottimizzazione...");
             sessionMoved.Clear();
             sessionDeleted.Clear();
-            
-            if (settings.SourceFolders == null || settings.SourceFolders.Count == 0) 
+
+            // Initialize run tracking
+            _currentRunId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_") + Guid.NewGuid().ToString("N")[..8];
+            _dirsEmptiedThisRun.Clear();
+
+            if (_coreSettings.SourceFolders == null || _coreSettings.SourceFolders.Count == 0)
             {
                 Log("⚠️ Nessuna cartella selezionata da ottimizzare. Trascina una cartella o clicca 'Sfoglia' nella zona di rilascio.");
                 Invoke(new Action(() => {
@@ -820,9 +769,9 @@ namespace CosmOrganizer
                         d.Description = "Seleziona la cartella da organizzare";
                         if (d.ShowDialog() == DialogResult.OK)
                         {
-                            if (!settings.SourceFolders.Contains(d.SelectedPath))
+                            if (!_coreSettings.SourceFolders.Contains(d.SelectedPath))
                             {
-                                settings.SourceFolders.Add(d.SelectedPath);
+                                _coreSettings.SourceFolders.Add(d.SelectedPath);
                                 SaveSettings();
                                 UpdateSourceUI();
                                 Log($"Cartella aggiunta: {d.SelectedPath}");
@@ -833,7 +782,7 @@ namespace CosmOrganizer
                 }));
             }
 
-            if (string.IsNullOrWhiteSpace(settings.LastDestinationFolder)) 
+            if (string.IsNullOrWhiteSpace(_coreSettings.LastDestinationFolder))
             {
                 Log("⚠️ Destinazione non impostata. Seleziona la cartella dove vuoi spostare i file.");
                 Invoke(new Action(() => {
@@ -842,46 +791,45 @@ namespace CosmOrganizer
                         d.Description = "Scegli dove salvare i file organizzati";
                         if (d.ShowDialog() == DialogResult.OK)
                         {
-                            settings.LastDestinationFolder = d.SelectedPath;
+                            _coreSettings.LastDestinationFolder = d.SelectedPath;
                             SaveSettings();
-                            Log($"Destinazione impostata a: {settings.LastDestinationFolder}");
+                            Log($"Destinazione impostata a: {_coreSettings.LastDestinationFolder}");
                         }
                         else return;
                     }
                 }));
             }
-            
-            string dest = settings.LastDestinationFolder;
+
+            string dest = _coreSettings.LastDestinationFolder;
             if (string.IsNullOrEmpty(dest)) return;
 
             try { if (!Directory.Exists(dest)) Directory.CreateDirectory(dest); } catch (Exception ex) { Log($"Errore creazione destinazione: {ex.Message}"); return; }
-            
-            var files = GetFiles(); 
+
+            var files = GetFiles();
             Log($"Trovati {files.Count} file totali da elaborare.");
-            
-            if (files.Count == 0) 
+
+            if (files.Count == 0)
             {
                 Log("Nessun file trovato nelle cartelle selezionate.");
                 await webView.ExecuteScriptAsync("addLog('⚠️ Nessun file da organizzare.');");
                 return;
             }
-            
-            operationHistory.Clear(); 
+
             cancellationTokenSource = new System.Threading.CancellationTokenSource();
-            
-            int ok = 0, err = 0; 
-            bool copy = false; 
+
+            int ok = 0, err = 0;
+            bool copy = false;
             var token = cancellationTokenSource.Token;
-            
+
             Log("Inizio elaborazione...");
-            
-            await Task.Run(async () => 
-            { 
+
+            await Task.Run(async () =>
+            {
                 int total = files.Count;
                 int lastPercent = -1;
 
-                for (int i = 0; i < total && !token.IsCancellationRequested; i++) 
-                { 
+                for (int i = 0; i < total && !token.IsCancellationRequested; i++)
+                {
                     int currentPercent = (int)((long)i * 100 / total);
                     if (currentPercent != lastPercent)
                     {
@@ -891,89 +839,48 @@ namespace CosmOrganizer
                     }
 
                     if (OrganizeFile(files[i], copy, token)) ok++; else err++;
-                } 
+                }
 
-                if (settings.DeleteEmptyFolders && !copy)
+                if (_coreSettings.DeleteEmptyFolders && !copy)
                 {
-                    foreach (var src in settings.SourceFolders)
-                    {
-                         if (Directory.Exists(src)) DeleteEmptyDirs(src);
-                    }
+                    foreach (var src in _coreSettings.SourceFolders)
+                        _safeFile.DeleteEmptyDirs(src, _dirsEmptiedThisRun);
                 }
             });
-            
+
             webView.ExecuteScriptAsync($"updateProgress(100, 'Completato')");
             await webView.ExecuteScriptAsync($"addLog('{T("complete")}: {ok} {T("files")}, {err} {T("errors")}');");
             PlayCompletionSound();
-            
-            // Aggiorna statistiche nel database e nella UI
-            settings.TotalFilesOrganized += ok;
+
             SaveSettings();
-            
+
             await Task.Delay(2000);
             Invoke(new Action(() => {
                 UpdateUIStats();
                 webView.ExecuteScriptAsync($"updateProgress(100, 'Ottimizzato')");
             }));
         }
-        
+
         private async void UndoOperations()
         {
-            if (operationHistory.Count == 0) 
+            if (string.IsNullOrEmpty(_currentRunId))
             {
                 Log("⚠️ Nessuna operazione recente da annullare.");
                 return;
             }
-            
-            Log("🔄 Ripristino file in corso...");
-            
-            int ok = 0;
-            int total = operationHistory.Count;
-            
-            await Task.Run(async () => 
-            { 
-                int total = operationHistory.Count;
-                int lastPercent = -1;
-
-                // Restore in reverse order
-                for (int i = total - 1; i >= 0; i--) 
-                { 
-                    int currentPercent = (int)((long)(total - 1 - i) * 100 / total);
-                    if (currentPercent != lastPercent)
-                    {
-                        lastPercent = currentPercent;
-                        webView.ExecuteScriptAsync($"updateProgress({currentPercent}, 'Ripristino...')");
-                    }
-
-                    var op = operationHistory[i]; 
-                    try 
-                    { 
-                        if (File.Exists(op.DestPath)) 
-                        { 
-                            string dir = Path.GetDirectoryName(op.SourcePath);
-                            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir); 
-                            
-                            File.Move(op.DestPath, op.SourcePath); 
-                            Log($"  Ripristinato: {Path.GetFileName(op.SourcePath)}");
-                            ok++; 
-                        } 
-                    } 
-                    catch (Exception ex) { Log($"  ERRORE Ripristino: {ex.Message}"); } 
-                } 
+            Log("🔄 Annullamento operazioni in corso...");
+            await Task.Run(() =>
+            {
+                var results = _journal.UndoRun(_currentRunId, _safeFile);
+                foreach (var (op, success, msg) in results)
+                    Log($"  {(success ? "✓" : "✗")} {Path.GetFileName(op.Source)}: {msg}");
             });
-            
-            webView.ExecuteScriptAsync($"updateProgress(100, 'Ripristinato')");
-            Log($"✅ Ripristino completato: {ok} file riportati alla posizione originale.");
-            PlayCompletionSound();
-            
-            operationHistory.Clear(); 
-            
-            await Task.Delay(2000);
-            webView.ExecuteScriptAsync($"updateProgress(0, 'Ottimizzato')");
-        } 
-        
-        private void Log(string m) 
-        { 
+            Log("✅ Annullamento completato.");
+            _currentRunId = string.Empty;
+        }
+
+        private void Log(string m)
+        {
             try
             {
                 if (webView != null && !webView.IsDisposed)
@@ -990,17 +897,49 @@ namespace CosmOrganizer
             catch { }
         }
 
+        private Task PostMessage(string type, string payload)
+        {
+            if (webView?.CoreWebView2 == null) return Task.CompletedTask;
+            var json = System.Text.Json.JsonSerializer.Serialize(new { type, payload });
+            return webView.CoreWebView2.ExecuteScriptAsync($"handleMessage({json})");
+        }
+
         private bool OrganizeFile(string f, bool copy, System.Threading.CancellationToken token)
         {
             if (token.IsCancellationRequested) return false;
+
+            // Safety checks
+            if (_safeFile.ShouldSkipFile(f)) return true; // skip silently
+
             var cat = GetCategory(f);
             try
             {
                 // Use settings or passed destination
-                var dest = Path.Combine(settings.LastDestinationFolder ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop), cat);
+                var dest = Path.Combine(_coreSettings.LastDestinationFolder ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop), cat);
+
+                // Check for protected path
+                if (_safeFile.IsProtectedPath(f))
+                {
+                    Log($"  ⚠️ Percorso protetto, saltato: {Path.GetFileName(f)}");
+                    return true;
+                }
+
+                // Check destination inside source
+                foreach (var src in _coreSettings.SourceFolders)
+                {
+                    if (_safeFile.IsDestinationInsideSource(src, dest))
+                    {
+                        Log($"  ⚠️ Destinazione dentro la sorgente, saltato: {Path.GetFileName(f)}");
+                        return true;
+                    }
+                }
+
                 Directory.CreateDirectory(dest);
                 var name = Path.GetFileName(f);
                 var target = Path.Combine(dest, name);
+
+                // Check same path
+                if (_safeFile.IsSamePath(f, target)) return true;
 
                 if (File.Exists(target))
                 {
@@ -1015,11 +954,18 @@ namespace CosmOrganizer
                         {
                             try
                             {
-                                File.Delete(f);
-                                sessionDeleted.Add(f);
-                                settings.TotalFilesDeleted++;
-                                operationHistory.Add(new FileOperation { SourcePath = f, DestPath = target, WasCopied = false });
-                                Log($"  Deleted source (Duplicate): {name}");
+                                if (_coreSettings.DeleteDuplicates)
+                                {
+                                    _safeFile.RecycleFile(f);
+                                    sessionDeleted.Add(f);
+                                    _journal.AppendEntry(new CosmOrganizer.Core.FileOperation(_currentRunId, DateTime.UtcNow, "recycled", f, target));
+                                    _dirsEmptiedThisRun.Add(Path.GetDirectoryName(f)!);
+                                    Log($"  Recycled (Duplicate): {name}");
+                                }
+                                else
+                                {
+                                    Log($"  Skipped (Duplicate, keep): {name}");
+                                }
                                 return true;
                             }
                             catch { return false; }
@@ -1028,11 +974,12 @@ namespace CosmOrganizer
                 }
 
                 int c = 1;
-                
+
                 // Compression Logic
-                bool shouldCompress = settings.CompressOldFiles 
-                    && (DateTime.Now - File.GetLastWriteTime(f)).TotalDays > settings.CompressDays
-                    && new FileInfo(f).Length >= settings.MinCompressSize;
+                bool shouldCompress = _coreSettings.CompressOldFiles
+                    && (DateTime.Now - File.GetLastWriteTime(f)).TotalDays > 90
+                    && new FileInfo(f).Length >= 10485760
+                    && !_safeFile.IsAlreadyCompressed(Path.GetExtension(f));
 
                 if (shouldCompress)
                 {
@@ -1043,14 +990,15 @@ namespace CosmOrganizer
                      {
                          archive.CreateEntryFromFile(f, name);
                      }
-                     
-                     if (!copy) File.Delete(f);
-                     
+
+                     if (!copy)
+                     {
+                         _safeFile.RecycleFile(f);
+                         _dirsEmptiedThisRun.Add(Path.GetDirectoryName(f)!);
+                     }
+
                      sessionMoved.Add(new { Name = name, Old = f, New = zipTarget });
-                     operationHistory.Add(new FileOperation { SourcePath = f, DestPath = zipTarget, WasCopied = copy });
-                     
-                     settings.TotalFilesCompressed++;
-                     settings.TotalSpaceSavedMB += (new FileInfo(zipTarget).Length / 1024 / 1024); // Approximation
+                     _journal.AppendEntry(new CosmOrganizer.Core.FileOperation(_currentRunId, DateTime.UtcNow, "compressed", f, zipTarget));
 
                      Log($"  COMPRESSO: {name} -> {cat}");
                      return true;
@@ -1058,10 +1006,20 @@ namespace CosmOrganizer
                 else
                 {
                     while (File.Exists(target)) target = Path.Combine(dest, $"{Path.GetFileNameWithoutExtension(name)} ({c++}){Path.GetExtension(name)}");
-                    
-                    if (copy) File.Copy(f, target); else File.Move(f, target);
-                    sessionMoved.Add(new { Name = name, Old = f, New = target });
-                    operationHistory.Add(new FileOperation { SourcePath = f, DestPath = target, WasCopied = copy });
+
+                    if (copy)
+                    {
+                        File.Copy(f, target);
+                        sessionMoved.Add(new { Name = name, Old = f, New = target });
+                        _journal.AppendEntry(new CosmOrganizer.Core.FileOperation(_currentRunId, DateTime.UtcNow, "copied", f, target));
+                    }
+                    else
+                    {
+                        _safeFile.MoveFile(f, target);
+                        _dirsEmptiedThisRun.Add(Path.GetDirectoryName(f)!);
+                        sessionMoved.Add(new { Name = name, Old = f, New = target });
+                        _journal.AppendEntry(new CosmOrganizer.Core.FileOperation(_currentRunId, DateTime.UtcNow, "moved", f, target));
+                    }
                     Log($"  OK: {name} -> {cat}");
                     return true;
                 }
@@ -1069,127 +1027,51 @@ namespace CosmOrganizer
             catch (Exception ex) { Log($"  ERR: {ex.Message}"); return false; }
         }
 
-        private void DeleteEmptyDirs(string startDir)
-        {
-            try
-            {
-                foreach (var d in Directory.GetDirectories(startDir))
-                {
-                    DeleteEmptyDirs(d);
-                }
-                
-                var entries = Directory.GetFileSystemEntries(startDir);
-                if (entries.Length == 0)
-                {
-                    Directory.Delete(startDir, false);
-                    Log($"  Removed empty dir: {startDir}");
-                }
-            }
-            catch { }
-        }
-
         private void UpdateWatchers()
         {
-            foreach (var w in watchers) { w.EnableRaisingEvents = false; w.Dispose(); }
-            watchers.Clear();
+            _realTime?.Dispose();
+            _realTime = null;
 
-            if (settings.RealTimeEnabled)
+            if (_coreSettings.SourceFolders.Count > 0 && isRealTimeEnabled)
             {
-                foreach (string path in settings.SourceFolders)
-                {
-                    if (Directory.Exists(path))
-                    {
-                        var w = new FileSystemWatcher(path);
-                        w.IncludeSubdirectories = settings.IncludeSubfolders;
-                        w.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite;
-                        w.Created += OnFileDetected;
-                        w.Renamed += OnFileDetected;
-                        w.EnableRaisingEvents = true;
-                        watchers.Add(w);
-                    }
-                }
-                Log("Real-time Monitoring Active ⚡");
-            }
-            else
-            {
-                Log("Real-time Monitoring Disabled");
+                _realTime = new RealTimeService(_safeFile);
+                _realTime.FileReady += OnFileReady;
+                _realTime.ScanRequired += msg => Log($"⚠️ Re-scan richiesto: {msg}");
+                foreach (var folder in _coreSettings.SourceFolders)
+                    _realTime.Watch(folder, _coreSettings.IncludeSubfolders);
+                Log("Monitoraggio Real-time Attivo ⚡");
             }
         }
 
-        private async void OnFileDetected(object sender, FileSystemEventArgs e)
+        private void OnFileReady(string path)
         {
-            // Wait for file to be fully written and unlocked
-            if (!await WaitForFileReady(e.FullPath, maxWaitSeconds: 30)) return;
-            
-            try
-            {
-                var fi = new FileInfo(e.FullPath);
-                if (settings.ExcludedExtensions.Contains(fi.Extension.ToLower())) return;
-                if (settings.ExcludedFolders.Any(ef => e.FullPath.Contains(ef))) return;
-                if (fi.Length < settings.MinFileSize || fi.Length > settings.MaxFileSize) return;
-
-                // Check if destination is set
-                if (string.IsNullOrWhiteSpace(settings.LastDestinationFolder)) return;
-                
-                OrganizeFile(e.FullPath, false, System.Threading.CancellationToken.None); // Default to move
-            }
-            catch { }
+            if (string.IsNullOrWhiteSpace(_coreSettings.LastDestinationFolder)) return;
+            // Run OrganizeFile on UI thread
+            this.BeginInvoke(new Action(() => OrganizeFile(path, false, System.Threading.CancellationToken.None)));
         }
 
-        private async Task<bool> WaitForFileReady(string filePath, int maxWaitSeconds)
-        {
-            int attempts = 0;
-            int maxAttempts = maxWaitSeconds * 2; // Check every 500ms
-            
-            while (attempts < maxAttempts)
-            {
-                try
-                {
-                    if (!File.Exists(filePath)) return false;
-                    
-                    // Try to open the file exclusively to check if it's locked
-                    using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-                    {
-                        return true; // File is ready
-                    }
-                }
-                catch (IOException)
-                {
-                    // File is still locked, wait and retry
-                    await Task.Delay(500);
-                    attempts++;
-                }
-                catch
-                {
-                    return false; // Other error, skip this file
-                }
-            }
-            
-            return false; // Timeout
-        }
-        
         [STAThread]
         static void Main(string[] args)
         {
             VelopackApp.Build().Run();
 
-            try 
-            { 
-                Application.EnableVisualStyles(); 
+            try
+            {
+                Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
-                
+
                 var form = new CosmOrganizerForm();
-                
+
                 if (args.Length > 0 && Directory.Exists(args[0]))
                 {
                     form.AddFolderFromArgs(args[0]);
                 }
-                
-                Application.Run(form); 
+
+                Application.Run(form);
             }
-            catch (Exception ex) 
-            { 
-                MessageBox.Show($"Errore: {ex.Message}\n\n{ex.StackTrace}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error); 
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Errore: {ex.Message}\n\n{ex.StackTrace}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
