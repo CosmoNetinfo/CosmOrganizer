@@ -1,0 +1,8 @@
+bin/
+obj/
+Installer/
+*.user
+*.suo
+*.log
+build_*.txt
+error.log

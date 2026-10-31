@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CosmOrganizer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="app-background">
+        <div class="nebula nebula-1"></div>
+        <div class="nebula nebula-2"></div>
+        <div class="nebula nebula-3"></div>
+        <div class="grid-overlay"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <nav class="sidebar glass">
+            <div class="logo">
+                <div class="logo-icon"><i class="ph-fill ph-planet"></i></div>
+                <span>Cosm<span class="highlight">Organizer</span></span>
+            </div>
+            
+            <div class="nav-menu">
+                <a href="#" class="nav-item active" onclick="showView('dashboard')">
+                    <i class="ph ph-house"></i>
+                    <span>Dashboard</span>
+                    <div class="glow-bar"></div>
+                </a>
+                <a href="#" class="nav-item" onclick="showView('settings')">
+                    <i class="ph ph-gear"></i>
+                    <span>Impostazioni</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showView('logs')">
+                    <i class="ph ph-list-bullets"></i>
+                    <span>Registro</span>
+                </a>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="version-tag">v3.2.0</div>
+                <button class="help-btn" onclick="window.chrome.webview.postMessage('help')">Aiuto</button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-bar">
+                <div class="breadcrumbs" id="pageTitle">System / Dashboard</div>
+                <div class="window-controls">
+                    <button class="win-btn minimize" onclick="window.chrome.webview.postMessage('minimize')"><i class="ph ph-minus"></i></button>
+                    <button class="win-btn close" onclick="window.chrome.webview.postMessage('close')"><i class="ph ph-x"></i></button>
+                </div>
+            </header>
+
+            <!-- VIEW: DASHBOARD -->
+            <div id="view-dashboard" class="view-section active">
+                <section class="hero-section">
+                    <div class="hero-ring-container">
+                        <div class="spinner-ring outer"></div>
+                        <div class="spinner-ring middle"></div>
+                        <div class="spinner-ring inner"></div>
+                        <div class="hero-content">
+                            <div class="hero-value" id="efficiencyVal">0<span class="percent">%</span></div>
+                            <div class="hero-label">Ottimizzato</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="stats-row">
+                    <div class="stat-card glass hover-glow clickable" onclick="window.chrome.webview.postMessage('showMoves')" title="Visualizza i file spostati">
+                        <div class="stat-content">
+                            <div class="stat-value text-cyan" id="statFiles">0</div>
+                            <div class="stat-label">File Spostati</div>
+                        </div>
+                        <div class="stat-icon cyan-bg"><i class="ph ph-folder-notch"></i></div>
+                    </div>
+                    <div class="stat-card glass hover-glow clickable" onclick="window.chrome.webview.postMessage('showDeleted')" title="Visualizza i file duplicati eliminati">
+                        <div class="stat-content">
+                            <div class="stat-value text-red" id="statDeleted">0</div>
+                            <div class="stat-label">File Cancellati</div>
+                        </div>
+                        <div class="stat-icon red-bg"><i class="ph ph-trash"></i></div>
+                    </div>
+                    <div class="stat-card glass hover-glow">
+                        <div class="stat-content">
+                            <div class="stat-value text-purple" id="statSpace">0 MB</div>
+                            <div class="stat-label">Spazio Risparmiato</div>
+                        </div>
+                        <div class="stat-icon purple-bg"><i class="ph ph-database"></i></div>
+                    </div>
+                    <div class="stat-card glass hover-glow" onclick="window.chrome.webview.postMessage('toggleRealTime')">
+                        <div class="stat-content">
+                            <div class="stat-value text-green" id="statMonitor">OFF</div>
+                            <div class="stat-label">Monitoraggio</div>
+                        </div>
+                        <div class="stat-icon green-bg" id="iconMonitor"><i class="ph ph-wifi-slash"></i></div>
+                    </div>
+                </section>
+
+                <section class="dest-section" style="margin: 0.5rem 0 1.5rem 0; text-align: center;">
+                    <div class="glass" style="display: inline-flex; align-items: center; gap: 15px; padding: 10px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                        <span style="color: var(--text-secondary); font-size: 0.85rem;">Destinazione:</span>
+                        <span id="destPath" style="color: var(--neon-cyan); font-weight: 500; font-size: 0.9rem;">Non selezionata</span>
+                        <button class="btn-browse" onclick="window.chrome.webview.postMessage('setDest')" title="Scegli cartella di destinazione" style="padding: 2px 8px;">📁 Sfoglia</button>
+                    </div>
+                </section>
+
+                <section class="optimize-section" style="display: flex; gap: 1rem; justify-content: center; align-items: center;">
+                    <button class="btn-optimize" onclick="window.chrome.webview.postMessage('organize')">
+                        <i class="ph-fill ph-magic-wand"></i>
+                        <span>Avvia Ottimizzazione</span>
+                    </button>
+                    
+                    <button class="btn-undo" onclick="confirmUndo()" title="Annulla l'ultima operazione">
+                        <i class="ph ph-arrow-counter-clockwise"></i>
+                        <span>Torna Indietro</span>
+                    </button>
+                </section>
+
+                <section class="action-section">
+                    <div class="drop-zone-container glass" id="dropZone" onclick="window.chrome.webview.postMessage('browse')">
+                        <div class="drop-border"></div>
+                        <div class="drop-content">
+                            <div class="drop-icon"><i class="ph ph-download-simple"></i></div>
+                            <h3>Trascina qui le cartelle da ottimizzare</h3>
+                            <p>o clicca per sfogliare il sistema</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- VIEW: SETTINGS -->
+            <div id="view-settings" class="view-section" style="display:none">
+                <div class="settings-grid">
+                    <div class="glass-panel settings-card">
+                        <h3><i class="ph ph-monitor"></i> Generali</h3>
+                        <div class="setting-item">
+                            <label>Tema Scuro</label>
+                            <label class="switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>Avvia all'Accensione</label>
+                            <label class="switch">
+                                <input type="checkbox" id="chkStartup" onchange="toggleSetting('startup', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>Includi Sottocartelle</label>
+                            <label class="switch">
+                                <input type="checkbox" id="chkSubfolders" onchange="toggleSetting('includeSub', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel settings-card">
+                        <h3><i class="ph ph-broom"></i> Pulizia</h3>
+                        <div class="setting-item">
+                            <label>Elimina Cartelle Vuote</label>
+                            <label class="switch">
+                                <input type="checkbox" id="chkDeleteEmpty" onchange="toggleSetting('deleteEmpty', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel settings-card">
+                        <h3><i class="ph ph-package"></i> Compressione</h3>
+                        <div class="setting-item">
+                            <label>Comprimi File Vecchi (>90 gg e >10MB)</label>
+                            <label class="switch">
+                                <input type="checkbox" id="chkCompress" onchange="toggleSetting('compress', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: LOGS -->
+            <div id="view-logs" class="view-section" style="display:none">
+                <div class="glass-panel full-height">
+                    <h2>Registro Attività</h2>
+                    <ul class="log-list" id="logList">
+                        <!-- I log verranno aggiunti qui -->
+                    </ul>
+                </div>
+            </div>
+
+        </main>
+    </div>
+    <!-- Modal for Details -->
+    <div id="modal-container" class="modal-overlay" style="display:none">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="modal-title">Dettaglio File</h3>
+                <button class="close-modal" onclick="closeModal()"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body">
+                <ul id="details-list" class="details-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        function confirmUndo() {
+            if (confirm("Vuoi annullare l'ultima operazione di spostamento file?\n\nI file verranno riportati nelle cartelle originali.")) {
+                window.chrome.webview.postMessage('undo');
+            }
+        }
+        
+        function closeModal() {
+            document.getElementById('modal-container').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
