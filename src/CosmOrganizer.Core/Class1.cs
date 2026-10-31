@@ -1,6 +1,7 @@
-﻿namespace CosmOrganizer.Core;
+// CosmOrganizer.Core
+// All Core services are in dedicated files:
+//   FileOperation.cs, SafeFileService.cs, SettingsService.cs,
+//   JournalService.cs, RealTimeService.cs
+// © CosmoNet.info — MIT License
 
-public class Class1
-{
-
-}
+namespace CosmOrganizer.Core;
