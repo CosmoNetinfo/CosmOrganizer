@@ -1,86 +1,47 @@
 # CosmOrganizer 🌌
 
-**CosmOrganizer** è l'assistente definitivo per mantenere il tuo PC pulito e organizzato. Monitora le tue cartelle in tempo reale e smista automaticamente i file nelle destinazioni corrette con un'interfaccia futuristica e intuitiva.
+**CosmOrganizer** è l'assistente per Windows che mantiene in ordine le tue cartelle (Download, Desktop, Documenti) in modo automatico e locale, senza telemetria né cloud.
 
 ![CosmOrganizer](logo.png)
 
-## ⚡ Cerchiamo tester per la versione 3.2.0!
+---
 
-La tua cartella Download è un caos? Proviamo insieme a sistemarla!
+## ⚡ Download e Installazione
 
-Scarica la versione più recente qui:  
-👉 [Release 3.2.0](https://github.com/CosmoNetinfo/CosmOrganizer/releases/tag/3.2.0)
+Scarica sempre l'ultima versione disponibile tramite i link stabili diretti:
 
-- **Portable**: `CosmOrganizer_v3.2.0_Portable.zip` (nessuna installazione necessaria)
-- **Installabile**: `CosmOrganizer_v3.2.0_Setup.exe`
+- 📦 **Installer (consigliato con auto-aggiornamenti):**  
+  👉 [CosmOrganizer-Setup.exe](https://github.com/CosmoNetinfo/CosmOrganizer/releases/latest/download/CosmOrganizer-Setup.exe)
+- 🧰 **Versione Portable (senza installazione):**  
+  👉 [CosmOrganizer-Portable.zip](https://github.com/CosmoNetinfo/CosmOrganizer/releases/latest/download/CosmOrganizer-Portable.zip)
 
-**Cosa ci serve da te:**
-- Provala sul tuo PC Windows
-- Segnala bug, crash o comportamenti strani
-- Condividi cosa ti piace e cosa miglioreresti
+### Requisiti
+Nessuno: l'applicazione è **self-contained** (.NET 8 non deve essere preinstallato) e la presenza del runtime WebView2 viene gestita automaticamente dall'installer.
 
-**Dove lasciare feedback?**
-- Apri una nuova **[Issue qui su GitHub](https://github.com/CosmoNetinfo/CosmOrganizer/issues/new/choose)** (è facilissimo!)
-- Oppure rispondi direttamente nei commenti della release
+> [!NOTE]
+> **Avviso Windows SmartScreen**: l'installer open source non possiede un certificato di firma a pagamento. Al primo avvio Windows potrebbe mostrare una schermata di avviso: è sufficiente fare clic su **"Ulteriori informazioni"** e poi su **"Esegui comunque"**.
 
-Ogni feedback ci aiuta a renderla perfetta! ❤️ Grazie mille!
+> [!IMPORTANT]
+> **Per gli utenti che usano CosmOrganizer 3.x**: se hai installato una versione precedente con il vecchio installer Inno Setup, disinstallala da *Impostazioni > App installate* di Windows prima di installare questa nuova versione. Da questo momento in poi, gli aggiornamenti avverranno in modo del tutto trasparente e automatico in background grazie a Velopack.
 
 ---
 
-## ✨ Funzionalità Principali (v3.2.0)
+## 🚀 Funzionalità in breve
 
-### 📊 Dashboard Statistiche Avanzata **(NOVITÀ)**
-
-Tieni traccia di tutto ciò che l'app fa per te:
-
-- **Percentuale di completamento**: Guarda in tempo reale il progresso dell'ottimizzazione con animazioni dinamiche.
-- **Dettaglio Operazioni**: Clicca sui contatori per vedere l'elenco esatto dei file spostati o dei duplicati eliminati.
-- **Spazio Risparmiato**: Monitora quanto spazio hai recuperato grazie alla compressione e all'organizzazione.
-
-### 🗂️ Categorizzazione Intelligente **(AGGIORNATO)**
-
-I file vengono ora smistati automaticamente in categorie precise:
-
-- 🖼️ **Immagini**: Foto, grafiche e icone.
-- 🎬 **Video**: Filmati e clip.
-- 📦 **Compressi**: Archivi e pacchetti.
-- 🚀 **Applicazioni**: Installer e file eseguibili.
-- 📂 **Miscellanea**: Tutto il resto (documenti, audio, ecc.).
-
-### ⚡ Monitoraggio Real-time (Magic Folder)
-
-Dimentica di spostare i file manualmente! CosmOrganizer osserva le tue cartelle (es. Download) e sposta i file appena creati nella destinazione corretta istantaneamente.
-
-### 📦 Smart Compression
-
-Risparmia spazio archiviando i file vecchi automaticamente:
-
-- I file che non usi da tempo (>90 giorni) e pesanti (>10MB) vengono compressi in `.zip` invece di essere solo spostati.
-
-### 🧹 Pulizia Vuota e Ripristino
-
-- **Auto-Cleanup**: Rimuove automaticamente le cartelle sorgenti che rimangono vuote dopo l'organizzazione.
-- **Funzione Undo (Annulla)**: Hai sbagliato? Un clic su "Torna Indietro" riporta tutti i file alla loro posizione originale.
-
-## 🚀 Installazione
-
-### Installer (Consigliato)
-
-1.  Scarica l'ultimo installer dalla sezione [Releases](https://github.com/CosmoNetinfo/CosmOrganizer/releases).
-2.  Esegui `CosmOrganizer_v3.2.0_Setup.exe`.
-3.  Segui la procedura guidata per l'installazione completa.
-
-### Versione Portable (.zip)
-
-1.  Scarica `CosmOrganizer_v3.2.0_Portable.zip`.
-2.  Estrai il contenuto in una cartella a tua scelta.
-3.  Avvia `CosmOrganizer.exe` direttamente.
-
-## 💻 Requisiti
-
-- Windows 10 o Windows 11
-- .NET 8.0 Runtime (l'installer verificherà la presenza per te)
+- **Smistamento per categoria**: Immagini, Video, Audio, Documenti, Archivi, Applicazioni e altro.
+- **Monitoraggio in tempo reale (Magic Folder)**: Rileva i nuovi file scaricati e li organizza appena pronti.
+- **Rilevamento duplicati**: Identifica file identici prima di creare copie inutili.
+- **Smart Compression**: Comprime file pesanti e non utilizzati da tempo in archivi `.zip`.
+- **Annullamento operazione**: Funzione "Torna Indietro" per ripristinare i file nella posizione originaria.
+- **100% Locale e Offline**: Nessun account, nessuna telemetria, nessun servizio cloud.
 
 ---
 
-© 2026 CosmoNet.info
+## 💬 Feedback e Segnalazioni
+
+Se riscontri anomalie o vuoi suggerire miglioramenti:
+- Apri una nuova **[Issue su GitHub](https://github.com/CosmoNetinfo/CosmOrganizer/issues/new/choose)**.
+
+---
+
+© 2026 CosmoNet.info — Rilasciato sotto licenza [MIT](LICENSE).

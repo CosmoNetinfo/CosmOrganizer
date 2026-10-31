@@ -763,3 +763,8 @@ input:checked + .slider:before { transform: translateX(20px); }
     box-shadow: 0 0 15px rgba(255, 100, 100, 0.4);
     transform: translateY(-2px);
 }
+
+.update-banner { display: flex; align-items: center; gap: 12px; background: rgba(0, 240, 255, 0.12); border: 1px solid rgba(0, 240, 255, 0.35); color: #e0e0e0; padding: 10px 16px; margin: 12px 24px 0 24px; border-radius: 8px; font-size: 0.9rem; }
+.update-banner i { color: var(--cyan, #00f0ff); font-size: 1.2rem; }
+.btn-update-restart { margin-left: auto; background: var(--cyan, #00f0ff); color: #000; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+.btn-update-restart:hover { opacity: 0.85; }

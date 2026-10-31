@@ -41,7 +41,7 @@
             </div>
 
             <div class="sidebar-footer">
-                <div class="version-tag">v3.2.0</div>
+                <div class="version-tag" id="appVersion">v3.3</div>
                 <button class="help-btn" onclick="window.chrome.webview.postMessage('help')">Aiuto</button>
             </div>
         </nav>
@@ -56,6 +56,12 @@
                     <button class="win-btn close" onclick="window.chrome.webview.postMessage('close')"><i class="ph ph-x"></i></button>
                 </div>
             </header>
+
+            <div id="updateBanner" class="update-banner" style="display:none;">
+                <i class="ph ph-sparkle"></i>
+                <span id="updateBannerText">Aggiornamento pronto — Riavvia per installare</span>
+                <button class="btn-update-restart" onclick="window.chrome.webview.postMessage('restartUpdate')">Riavvia</button>
+            </div>
 
             <!-- VIEW: DASHBOARD -->
             <div id="view-dashboard" class="view-section active">

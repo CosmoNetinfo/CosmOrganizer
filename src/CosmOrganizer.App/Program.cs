@@ -15,6 +15,7 @@ using System.IO.Compression;
 using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using Velopack;
 
 namespace CosmOrganizer
 {
@@ -69,8 +70,7 @@ namespace CosmOrganizer
         private System.Threading.CancellationTokenSource cancellationTokenSource;
         private Dictionary<string, Dictionary<string, string>> translations;
         private string currentLanguage = "it";
-        private const string APP_VERSION = "3.2.0";
-        private const string UPDATE_CHECK_URL = "https://api.github.com/repos/CosmoNetinfo/CosmOrganizer/releases/latest";
+        private UpdateService updateService;
         
         // Real-time Monitoring
         private CheckBox chkRealTime;
@@ -99,6 +99,7 @@ namespace CosmOrganizer
             public bool IncludeSubfolders { get; set; } = false; // Default false
             public int CompressDays { get; set; } = 90;
             public long MinCompressSize { get; set; } = 10485760; // Default 10MB
+            public bool AutoUpdateEnabled { get; set; } = true;
             
             // Statistics
             public long TotalFilesOrganized { get; set; }
@@ -126,8 +127,19 @@ namespace CosmOrganizer
             
             this.Resize += (s, e) => ApplyRoundedCorners();
             
-            // 🔄 Check aggiornamenti
-            Task.Run(() => CheckForUpdates());
+            // Auto Update Service via Velopack
+            updateService = new UpdateService(() => settings.AutoUpdateEnabled, OnUpdateReady);
+            updateService.Start();
+            this.FormClosing += (s, e) => updateService.ApplyOnShutdown();
+        }
+
+        private void OnUpdateReady(string newVersion)
+        {
+            if (this.IsDisposed || !this.IsHandleCreated) return;
+            this.BeginInvoke(new Action(() =>
+            {
+                webView?.CoreWebView2?.ExecuteScriptAsync($"showUpdateBanner('{newVersion}');");
+            }));
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -161,77 +173,6 @@ namespace CosmOrganizer
         {
             try { SystemSounds.Asterisk.Play(); }
             catch { }
-        }
-        
-        private async Task CheckForUpdates()
-        {
-            try
-            {
-                using (var client = new HttpClient())
-                {
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd("CosmOrganizer");
-                    client.Timeout = TimeSpan.FromSeconds(5);
-                    
-                    var response = await client.GetStringAsync(UPDATE_CHECK_URL);
-                    var tagStart = response.IndexOf("\"tag_name\":\"") + 12;
-                    
-                    if (tagStart > 11)
-                    {
-                        var tagEnd = response.IndexOf("\"", tagStart);
-                        if (tagEnd > tagStart)
-                        {
-                            var latestVersion = response.Substring(tagStart, tagEnd - tagStart).TrimStart('v').Trim();
-                            
-                            // Confronto versioni: verifica che sia valida e diversa
-                            if (!string.IsNullOrEmpty(latestVersion) && 
-                                latestVersion != APP_VERSION && 
-                                IsNewerVersion(latestVersion, APP_VERSION))
-                            {
-                                Invoke(new Action(() =>
-                                {
-                                    var result = MessageBox.Show(
-                                        $"È disponibile una nuova versione: {latestVersion}\nVersione attuale: {APP_VERSION}\n\nVuoi scaricare l'aggiornamento?",
-                                        "Aggiornamento Disponibile",
-                                        MessageBoxButtons.YesNo,
-                                        MessageBoxIcon.Information
-                                    );
-                                    
-                                    if (result == DialogResult.Yes)
-                                    {
-                                        Process.Start(new ProcessStartInfo
-                                        {
-                                            FileName = "https://github.com/CosmoNetinfo/CosmOrganizer/releases/latest",
-                                            UseShellExecute = true
-                                        });
-                                    }
-                                }));
-                            }
-                        }
-                    }
-                }
-            }
-            catch { }
-        }
-        
-        private bool IsNewerVersion(string latest, string current)
-        {
-            try
-            {
-                var latestParts = latest.Split('.').Select(int.Parse).ToArray();
-                var currentParts = current.Split('.').Select(int.Parse).ToArray();
-                
-                for (int i = 0; i < Math.Min(latestParts.Length, currentParts.Length); i++)
-                {
-                    if (latestParts[i] > currentParts[i]) return true;
-                    if (latestParts[i] < currentParts[i]) return false;
-                }
-                
-                return latestParts.Length > currentParts.Length;
-            }
-            catch
-            {
-                return false; // In caso di errore, non mostrare l'alert
-            }
         }
         
         private void InitializeTranslations()
@@ -349,7 +290,13 @@ namespace CosmOrganizer
             
             // Event Handlers
             webView.WebMessageReceived += WebView_WebMessageReceived;
-            webView.NavigationCompleted += (s, e) => UpdateUIStats();
+            webView.NavigationCompleted += (s, e) =>
+            {
+                UpdateUIStats();
+                var ver = typeof(CosmOrganizerForm).Assembly.GetName().Version;
+                string verStr = ver != null ? $"{ver.Major}.{ver.Minor}" : "3.3";
+                webView.ExecuteScriptAsync($"setAppVersion('{verStr}');");
+            };
             
             // Native Drag & Drop Implementation
             webView.DragEnter += (s, e) => 
@@ -474,16 +421,14 @@ namespace CosmOrganizer
                     settings.CompressOldFiles = val == "true";
                     SaveSettings();
                 }
-                else if (msg.StartsWith("set:deleteEmpty:"))
-                {
-                    var val = msg.Substring("set:deleteEmpty:".Length);
-                    settings.DeleteEmptyFolders = val == "true";
-                    SaveSettings();
-                }
                 else if (msg.StartsWith("set:startup:"))
                 {
                     var val = msg.Substring("set:startup:".Length);
                     SetStartupRegistry(val == "true");
+                }
+                else if (msg == "restartUpdate")
+                {
+                    updateService?.RestartAndApply();
                 }
                 else if (msg.StartsWith("set:includeSub:"))
                 {
@@ -1226,6 +1171,8 @@ namespace CosmOrganizer
         [STAThread]
         static void Main(string[] args)
         {
+            VelopackApp.Build().Run();
+
             try 
             { 
                 Application.EnableVisualStyles(); 

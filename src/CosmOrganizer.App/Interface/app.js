@@ -129,3 +129,6 @@ function toggleSetting(name, value) {
         window.chrome.webview.postMessage('set:' + name + ':' + value);
     }
 }
+
+function setAppVersion(v) { const el = document.getElementById('appVersion') || document.querySelector('.version-tag'); if (el) el.textContent = 'v' + v; }
+function showUpdateBanner(v) { const banner = document.getElementById('updateBanner'); const txt = document.getElementById('updateBannerText'); if (banner && txt) { txt.textContent = 'Aggiornamento ' + v + ' pronto — Riavvia per installare'; banner.style.display = 'flex'; } }

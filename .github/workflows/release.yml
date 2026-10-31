@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Determine Version
+        shell: pwsh
+        run: |
+          $baseVer = (Get-Content version.txt).Trim()
+          $ver = "$baseVer.${{ github.run_number }}"
+          Write-Host "Releasing version: $ver"
+          "VER=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Run Tests
+        run: dotnet test CosmOrganizer.sln -c Release
+
+      - name: Publish App
+        shell: pwsh
+        run: |
+          dotnet publish src/CosmOrganizer.App -c Release -r win-x64 --self-contained -p:Version=$env:VER -o publish
+
+      - name: Install Velopack CLI (vpk)
+        shell: pwsh
+        run: |
+          dotnet tool install -g vpk
+
+      - name: Download Previous Releases (for Delta packages)
+        shell: pwsh
+        run: |
+          try {
+            vpk download github --repoUrl "https://github.com/${{ github.repository }}" -o Releases
+          } catch {
+            Write-Host "Nessuna release precedente trovata, procedo con build completa."
+          }
+
+      - name: Pack with Velopack
+        shell: pwsh
+        run: |
+          vpk pack --packId CosmOrganizer --packVersion $env:VER --packDir publish --mainExe CosmOrganizer.exe --packTitle CosmOrganizer --icon app.ico --framework webview2 -o Releases
+
+      - name: Upload Release to GitHub
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          vpk upload github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}" --publish --releaseName "CosmOrganizer $env:VER" --tag "v$env:VER" -o Releases
