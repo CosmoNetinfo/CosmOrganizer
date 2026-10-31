@@ -1,7 +1,7 @@
 ﻿// CosmOrganizer Interface Client Script
 // © CosmoNet.info — MIT License
 
-let currentLang = 'it';
+let currentLang = localStorage.getItem('cosmo_lang') || 'it';
 let translations = {};
 let previewData = [];
 let duplicatesData = [];
@@ -13,11 +13,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('DOM fully loaded');
     await loadTranslations(currentLang);
     applyThemeFromStorage();
+    const selLang = document.getElementById('selLang');
+    if (selLang) selLang.value = currentLang;
 
     if (window.chrome && window.chrome.webview) {
         window.chrome.webview.addEventListener('message', event => {
             if (event.data) handleMessage(event.data);
         });
+
+// Keyboard Shortcuts & Function Keys
+window.addEventListener('keydown', (e) => {
+    // Esc: close modal if open
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('modal-container');
+        if (modal && modal.style.display !== 'none') {
+            closeModal();
+            return;
+        }
+    }
+    // Ctrl + Z: Undo
+    if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        confirmUndo();
+        return;
+    }
+    // Ctrl + O: Add / Browse folder
+    if (e.ctrlKey && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault();
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.postMessage('browse');
+        }
+        return;
+    }
+    // F1: Help
+    if (e.key === 'F1') {
+        e.preventDefault();
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.postMessage('help');
+        }
+        return;
+    }
+    // F5: Refresh UI / Stats
+    if (e.key === 'F5') {
+        e.preventDefault();
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.postMessage('refresh');
+        }
+        return;
+    }
+});
         window.chrome.webview.postMessage('pageReady');
     }
 });
@@ -46,6 +90,9 @@ function applyTranslations() {
 }
 
 function setLanguage(lang) {
+    localStorage.setItem('cosmo_lang', lang);
+    const sel = document.getElementById('selLang');
+    if (sel) sel.value = lang;
     loadTranslations(lang);
     if (window.chrome && window.chrome.webview) {
         window.chrome.webview.postMessage('set:language:' + lang);
