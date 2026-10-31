@@ -39,6 +39,21 @@ public class AppSettings
 
     [JsonPropertyName("deleteDuplicates")]
     public bool DeleteDuplicates { get; set; } = true; // true = Recycle Bin, false = keep
+
+    [JsonPropertyName("windowLeft")]
+    public int WindowLeft { get; set; } = 0;
+
+    [JsonPropertyName("windowTop")]
+    public int WindowTop { get; set; } = 0;
+
+    [JsonPropertyName("windowWidth")]
+    public int WindowWidth { get; set; } = 0;
+
+    [JsonPropertyName("windowHeight")]
+    public int WindowHeight { get; set; } = 0;
+
+    [JsonPropertyName("isMaximized")]
+    public bool IsMaximized { get; set; } = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,22 +65,24 @@ public class AppSettings
 /// </summary>
 public class SettingsService
 {
-    // New canonical path
-    private static readonly string SettingsDir =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CosmOrganizer");
-
-    private static readonly string SettingsPath =
-        Path.Combine(SettingsDir, "settings.json");
-
-    // Legacy path from CosmOrganizer v3
-    private static readonly string LegacySettingsPath =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CosmOrganizer_v3.json");
+    private readonly string _settingsDir;
+    private readonly string _settingsPath;
+    private readonly string _legacySettingsPath;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         WriteIndented = true,
         PropertyNameCaseInsensitive = true
     };
+
+    public SettingsService(string? settingsDir = null, string? legacySettingsPath = null)
+    {
+        _settingsDir = settingsDir ??
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CosmOrganizer");
+        _settingsPath = Path.Combine(_settingsDir, "settings.json");
+        _legacySettingsPath = legacySettingsPath ??
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CosmOrganizer_v3.json");
+    }
 
     /// <summary>
     /// Loads settings. Returns (settings, wasCorrupted).
@@ -74,12 +91,12 @@ public class SettingsService
     /// </summary>
     public (AppSettings Settings, bool WasCorrupted) Load()
     {
-        Directory.CreateDirectory(SettingsDir);
+        Directory.CreateDirectory(_settingsDir);
 
-        if (!File.Exists(SettingsPath))
+        if (!File.Exists(_settingsPath))
         {
             // Attempt migration from legacy v3 file
-            if (File.Exists(LegacySettingsPath))
+            if (File.Exists(_legacySettingsPath))
             {
                 var migrated = TryMigrateFromV3();
                 if (migrated != null)
@@ -93,7 +110,7 @@ public class SettingsService
 
         try
         {
-            var json = File.ReadAllText(SettingsPath);
+            var json = File.ReadAllText(_settingsPath);
             var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOpts);
             if (settings == null) throw new JsonException("Null result");
             return (settings, false);
@@ -101,8 +118,8 @@ public class SettingsService
         catch
         {
             // Back up corrupt file
-            var bakPath = SettingsPath + ".bak";
-            try { File.Copy(SettingsPath, bakPath, overwrite: true); } catch { /* ignore */ }
+            var bakPath = _settingsPath + ".bak";
+            try { File.Copy(_settingsPath, bakPath, overwrite: true); } catch { /* ignore */ }
 
             return (new AppSettings(), true);
         }
@@ -113,17 +130,17 @@ public class SettingsService
     /// </summary>
     public void Save(AppSettings settings)
     {
-        Directory.CreateDirectory(SettingsDir);
+        Directory.CreateDirectory(_settingsDir);
 
         var json = JsonSerializer.Serialize(settings, JsonOpts);
-        var tempPath = SettingsPath + ".tmp";
+        var tempPath = _settingsPath + ".tmp";
 
         File.WriteAllText(tempPath, json);
 
-        if (File.Exists(SettingsPath))
-            File.Replace(tempPath, SettingsPath, destinationBackupFileName: null);
+        if (File.Exists(_settingsPath))
+            File.Replace(tempPath, _settingsPath, destinationBackupFileName: null);
         else
-            File.Move(tempPath, SettingsPath);
+            File.Move(tempPath, _settingsPath);
     }
 
     // ---------------------------------------------------------------------------
@@ -138,7 +155,7 @@ public class SettingsService
     {
         try
         {
-            var json = File.ReadAllText(LegacySettingsPath);
+            var json = File.ReadAllText(_legacySettingsPath);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
