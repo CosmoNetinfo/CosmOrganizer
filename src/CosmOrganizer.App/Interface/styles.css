@@ -768,3 +768,128 @@ input:checked + .slider:before { transform: translateX(20px); }
 .update-banner i { color: var(--cyan, #00f0ff); font-size: 1.2rem; }
 .btn-update-restart { margin-left: auto; background: var(--cyan, #00f0ff); color: #000; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
 .btn-update-restart:hover { opacity: 0.85; }
+
+/* --- Theme & Fase 2 Additions --- */
+body.theme-light {
+    --bg-dark: #f5f7fb;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+body.theme-light .sidebar { background: rgba(255, 255, 255, 0.9); }
+body.theme-light .glass { background: var(--glass-bg); border-color: var(--glass-border); box-shadow: var(--glass-shadow); }
+body.theme-light .hero-value, body.theme-light .nav-item span { color: var(--text-primary); }
+
+/* --- Profile Selector Bar --- */
+.profile-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 10px 24px;
+    margin: 10px 24px 0 24px;
+    border-radius: 12px;
+}
+.profile-select-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.select-styled {
+    background: rgba(15, 23, 42, 0.7);
+    color: var(--text-primary);
+    border: 1px solid var(--glass-border);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    outline: none;
+}
+body.theme-light .select-styled {
+    background: #ffffff;
+    color: #1e293b;
+}
+
+/* --- Preview Table --- */
+.preview-container {
+    padding: 16px;
+    max-height: 550px;
+    overflow-y: auto;
+}
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.preview-table th, .preview-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--glass-border);
+}
+.preview-table th {
+    color: var(--neon-cyan);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+.preview-table tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* --- Rules View --- */
+.rules-container {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.rule-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    border-radius: 10px;
+}
+.rule-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.rule-name { font-weight: 600; font-size: 0.95rem; }
+.rule-detail { font-size: 0.8rem; color: var(--text-secondary); }
+.rule-actions { display: flex; align-items: center; gap: 8px; }
+
+/* Buttons */
+.btn-preview {
+    background: rgba(45, 110, 255, 0.15);
+    border: 1px solid rgba(45, 110, 255, 0.4);
+    color: var(--neon-cyan);
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+.btn-preview:hover {
+    background: rgba(45, 110, 255, 0.3);
+    transform: translateY(-2px);
+}
+.btn-action {
+    background: var(--neon-cyan);
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.btn-action:hover { opacity: 0.85; }
