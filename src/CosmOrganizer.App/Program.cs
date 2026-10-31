@@ -133,6 +133,17 @@ namespace CosmOrganizer
                 BrowseForSourceFolder();
                 return true;
             }
+            if (keyData == Keys.F1)
+            {
+                OpenHelp();
+                return true;
+            }
+            if (keyData == Keys.F5)
+            {
+                UpdateUIStats();
+                UpdateSourceUI();
+                return true;
+            }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
@@ -147,6 +158,15 @@ namespace CosmOrganizer
             {
                 UndoOperations();
             }
+        }
+
+        private void OpenHelp()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = "https://www.cosmonet.info/scrivici/", UseShellExecute = true });
+            }
+            catch { }
         }
 
         // ---------------------------------------------------------------------------
@@ -675,11 +695,13 @@ namespace CosmOrganizer
                 }
                 else if (raw == "help")
                 {
-                    try
-                    {
-                        Process.Start(new ProcessStartInfo { FileName = "https://www.cosmonet.info/scrivici/", UseShellExecute = true });
-                    }
-                    catch { }
+                    OpenHelp();
+                }
+                else if (raw == "refresh")
+                {
+                    UpdateUIStats();
+                    UpdateSourceUI();
+                    Log("Interfaccia e statistiche aggiornate.");
                 }
             }
             catch (Exception ex)

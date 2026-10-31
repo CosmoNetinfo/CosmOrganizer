@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -405,7 +405,7 @@
         </main>
     </div>
     <!-- Modal for Details -->
-    <div id="modal-container" class="modal-overlay" style="display:none">
+    <div id="modal-container" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeModal()">
         <div class="modal-content glass">
             <div class="modal-header">
                 <h3 id="modal-title">Dettaglio File</h3>
@@ -431,4 +431,5 @@
     </script>
 </body>
 </html>
+
 
