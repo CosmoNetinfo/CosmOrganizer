@@ -1,4 +1,4 @@
-// CosmOrganizer - Main Application & Form
+﻿// CosmOrganizer - Main Application & Form
 // WinForms + WebView2 host for modern HTML interface.
 // © CosmoNet.info — MIT License
 
@@ -119,6 +119,34 @@ namespace CosmOrganizer
                 DwmSetWindowAttribute(this.Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
             }
             catch { }
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == (Keys.Control | Keys.Z))
+            {
+                ConfirmUndoFromKeyboard();
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.O))
+            {
+                BrowseForSourceFolder();
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void ConfirmUndoFromKeyboard()
+        {
+            var res = MessageBox.Show(
+                "Vuoi annullare l'ultima operazione di spostamento file?\n\nI file verranno riportati nelle cartelle originali.",
+                "Conferma Annulla (Ctrl+Z)",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+            if (res == DialogResult.Yes)
+            {
+                UndoOperations();
+            }
         }
 
         // ---------------------------------------------------------------------------
@@ -319,9 +347,42 @@ namespace CosmOrganizer
                 var env = await CoreWebView2Environment.CreateAsync(null, userFolder);
                 await _webView.EnsureCoreWebView2Async(env);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                MessageBox.Show($"Errore inizializzazione WebView2: {ex.Message}", "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Controls.Remove(_webView);
+                _webView.Dispose();
+                _webView = null;
+
+                var pnl = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(5, 7, 10) };
+                var lbl = new Label
+                {
+                    Text = "Per usare CosmOrganizer è necessario il runtime Microsoft Edge WebView2.\n\nIl componente non è presente o non è stato possibile avviarlo.",
+                    ForeColor = Color.White,
+                    Font = new Font("Segoe UI", 11, FontStyle.Regular),
+                    AutoSize = false,
+                    Size = new Size(600, 70),
+                    Location = new Point(50, 60),
+                    TextAlign = ContentAlignment.TopLeft
+                };
+                var link = new LinkLabel
+                {
+                    Text = "Scarica Microsoft Edge WebView2 Runtime dal sito ufficiale Microsoft",
+                    LinkColor = Color.FromArgb(88, 166, 255),
+                    Font = new Font("Segoe UI", 10, FontStyle.Underline),
+                    AutoSize = true,
+                    Location = new Point(50, 140)
+                };
+                link.LinkClicked += (s, ev) =>
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo("https://developer.microsoft.com/microsoft-edge/webview2/") { UseShellExecute = true });
+                    }
+                    catch { }
+                };
+                pnl.Controls.Add(lbl);
+                pnl.Controls.Add(link);
+                Controls.Add(pnl);
                 return;
             }
 
@@ -1051,8 +1112,34 @@ namespace CosmOrganizer
             catch { }
         }
 
+        private void SaveWindowPosition()
+        {
+            try
+            {
+                if (this.WindowState == FormWindowState.Normal)
+                {
+                    _coreSettings.WindowLeft = this.Location.X;
+                    _coreSettings.WindowTop = this.Location.Y;
+                    _coreSettings.WindowWidth = this.Size.Width;
+                    _coreSettings.WindowHeight = this.Size.Height;
+                    _coreSettings.IsMaximized = false;
+                }
+                else if (this.WindowState == FormWindowState.Maximized)
+                {
+                    _coreSettings.IsMaximized = true;
+                    _coreSettings.WindowLeft = this.RestoreBounds.Location.X;
+                    _coreSettings.WindowTop = this.RestoreBounds.Location.Y;
+                    _coreSettings.WindowWidth = this.RestoreBounds.Size.Width;
+                    _coreSettings.WindowHeight = this.RestoreBounds.Size.Height;
+                }
+                SaveCoreSettings();
+            }
+            catch { }
+        }
+
         private void OnFormClosing(object? sender, FormClosingEventArgs e)
         {
+            SaveWindowPosition();
             // If user closed with X and tray is active, minimize to tray
             if (e.CloseReason == CloseReason.UserClosing && _trayIcon != null)
             {
