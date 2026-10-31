@@ -30,6 +30,22 @@
                     <span data-i18n="navDashboard">Dashboard</span>
                     <div class="glow-bar"></div>
                 </a>
+                <a href="#" class="nav-item" onclick="showView('duplicates')">
+                    <i class="ph ph-copy"></i>
+                    <span data-i18n="navDuplicates">Duplicati</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showView('storage')">
+                    <i class="ph ph-chart-pie"></i>
+                    <span data-i18n="navStorage">Spazio</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showView('clean')">
+                    <i class="ph ph-broom"></i>
+                    <span data-i18n="navClean">Pulizia</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showView('history')">
+                    <i class="ph ph-clock-counter-clockwise"></i>
+                    <span data-i18n="navHistory">Dov'è finito?</span>
+                </a>
                 <a href="#" class="nav-item" onclick="showView('rules')">
                     <i class="ph ph-sliders"></i>
                     <span data-i18n="navRules">Regole</span>
@@ -177,6 +193,73 @@
                 </section>
             </div>
 
+            <!-- VIEW: DUPLICATES -->
+            <div id="view-duplicates" class="view-section" style="display:none">
+                <div class="glass-panel full-height">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h2 data-i18n="duplicatesTitle">Ricerca File Duplicati</h2>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-action" onclick="scanDuplicates()" data-i18n="scanDuplicates">🔍 Scansiona</button>
+                            <button class="btn-undo" onclick="recycleDuplicates()" data-i18n="recycleSelected">🗑️ Cestina</button>
+                        </div>
+                    </div>
+                    <div id="duplicatesList" class="preview-container">
+                        <div style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            Clicca "Scansiona" per identificare i file duplicati identici (tramite hash SHA-256).
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: STORAGE -->
+            <div id="view-storage" class="view-section" style="display:none">
+                <div class="glass-panel full-height">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h2 data-i18n="storageTitle">Analisi Utilizzo Spazio Disco</h2>
+                        <button class="btn-action" onclick="analyzeStorage()" data-i18n="scanStorage">📊 Analizza Cartella</button>
+                    </div>
+                    <div id="storageReport" class="preview-container">
+                        <div style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            Analizza i file più pesanti e l'occupazione per sottocartella del profilo attivo.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: CLEANUP -->
+            <div id="view-clean" class="view-section" style="display:none">
+                <div class="glass-panel full-height">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h2 data-i18n="cleanTitle">Pulizia File Spazzatura & Installer</h2>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-action" onclick="scanJunk()" data-i18n="scanJunk">🧹 Cerca File Vuoti & Temp</button>
+                            <button class="btn-action" onclick="scanInstallers()" data-i18n="scanInstallers">📦 Installer Vecchi</button>
+                        </div>
+                    </div>
+                    <div id="cleanupList" class="preview-container">
+                        <div style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            Scansiona ed elimina in sicurezza (nel Cestino) file temporanei, vuoti (0 byte) o vecchi installer.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: HISTORY -->
+            <div id="view-history" class="view-section" style="display:none">
+                <div class="glass-panel full-height">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 15px;">
+                        <h2 data-i18n="historyTitle">Cronologia & "Dov'è finito?"</h2>
+                        <div style="display: flex; gap: 10px; flex: 1; max-width: 400px;">
+                            <input type="text" id="txtSearchHistory" class="select-styled" style="flex:1;" placeholder="Cerca per nome file..." onkeyup="if(event.key==='Enter') searchHistoryFile()">
+                            <button class="btn-action" onclick="searchHistoryFile()">🔎 Cerca</button>
+                        </div>
+                    </div>
+                    <div id="historyResults" class="preview-container">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+
             <!-- VIEW: RULES -->
             <div id="view-rules" class="view-section" style="display:none">
                 <div class="glass-panel full-height">
@@ -239,6 +322,13 @@
                             <label data-i18n="startup">Avvia con Windows</label>
                             <label class="switch">
                                 <input type="checkbox" id="chkStartup" onchange="toggleSetting('startup', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label data-i18n="contextMenu">Menu Contestuale Esplora Risorse</label>
+                            <label class="switch">
+                                <input type="checkbox" id="chkContextMenu" onchange="toggleSetting('contextMenu', this.checked)">
                                 <span class="slider"></span>
                             </label>
                         </div>
