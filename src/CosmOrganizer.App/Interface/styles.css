@@ -215,8 +215,7 @@ body {
 }
 
 .window-controls {
-    display: flex;
-    gap: 10px;
+    display: none !important;
 }
 
 .win-btn {
@@ -497,11 +496,11 @@ body {
 
 /* --- Multi-View Styles --- */
 .view-section {
-    display: none !important;
+    display: none;
     height: 100%;
     flex-direction: column;
     gap: 1.5rem;
-    animation: fadeIn 0.4s ease;
+    animation: fadeIn 0.3s ease;
 }
 
 .view-section.active { 
@@ -511,9 +510,7 @@ body {
 }
 
 /* Force visibility of active content */
-.view-section.active * {
-    visibility: visible !important;
-}
+
 
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }

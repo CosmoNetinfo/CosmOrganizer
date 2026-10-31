@@ -1,4 +1,4 @@
-﻿// CosmOrganizer Interface Client Script
+// CosmOrganizer Interface Client Script
 // © CosmoNet.info — MIT License
 
 let currentLang = localStorage.getItem('cosmo_lang') || 'it';
@@ -128,37 +128,48 @@ function applyThemeFromStorage() {
 
 // --- Navigation Logic ---
 function showView(viewId) {
-    document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-    
     const views = ['dashboard', 'duplicates', 'storage', 'clean', 'history', 'rules', 'preview', 'settings', 'logs'];
     const navItems = document.querySelectorAll('.nav-item');
-    const index = views.indexOf(viewId);
     
+    // 1. Update navigation items
+    navItems.forEach(nav => nav.classList.remove('active'));
+    const index = views.indexOf(viewId);
     if (index !== -1 && navItems[index]) {
         navItems[index].classList.add('active');
-        document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
-        
-        const targetView = document.getElementById('view-' + viewId);
-        if (targetView) targetView.style.display = 'block';
-        
-        const pageTitle = document.getElementById('pageTitle');
-        if (pageTitle) {
-            const titleKeys = {
-                dashboard: 'systemDashboard',
-                duplicates: 'systemDuplicates',
-                storage: 'systemStorage',
-                clean: 'systemClean',
-                history: 'systemHistory',
-                rules: 'systemRules',
-                preview: 'systemPreview',
-                settings: 'systemSettings',
-                logs: 'systemLogs'
-            };
-            const key = titleKeys[viewId];
-            pageTitle.textContent = translations[key] || ('System / ' + viewId);
-        }
+    }
+
+    // 2. Hide all view sections and remove .active class
+    document.querySelectorAll('.view-section').forEach(el => {
+        el.classList.remove('active');
+        el.style.display = 'none';
+    });
+    
+    // 3. Show target view section and add .active class
+    const targetView = document.getElementById('view-' + viewId);
+    if (targetView) {
+        targetView.classList.add('active');
+        targetView.style.display = 'flex';
+    }
+    
+    // 4. Update page title
+    const pageTitle = document.getElementById('pageTitle');
+    if (pageTitle) {
+        const titleKeys = {
+            dashboard: 'systemDashboard',
+            duplicates: 'systemDuplicates',
+            storage: 'systemStorage',
+            clean: 'systemClean',
+            history: 'systemHistory',
+            rules: 'systemRules',
+            preview: 'systemPreview',
+            settings: 'systemSettings',
+            logs: 'systemLogs'
+        };
+        const key = titleKeys[viewId];
+        pageTitle.textContent = translations[key] || ('System / ' + viewId);
     }
 }
+
 
 // Drag & Drop visual feedback
 const dropZone = document.getElementById('dropZone');
