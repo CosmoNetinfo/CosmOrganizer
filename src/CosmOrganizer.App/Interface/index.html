@@ -1,12 +1,13 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CosmOrganizer</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="vendor/outfit/outfit.css">
+    <link rel="stylesheet" href="vendor/phosphor/regular.css">
+    <link rel="stylesheet" href="vendor/phosphor/fill.css">
 </head>
 <body>
     <div class="app-background">
@@ -369,6 +370,25 @@
                             </label>
                         </div>
                     </div>
+
+                    <div class="glass-panel settings-card">
+                        <h3><i class="ph ph-arrows-clockwise"></i> <span>Aggiornamenti</span></h3>
+                        <div class="setting-item">
+                            <label>Aggiornamenti automatici</label>
+                            <label class="switch">
+                                <input type="checkbox" id="chkAutoUpdate" onchange="toggleSetting('autoUpdate', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <button class="btn-action" onclick="checkUpdatesManual()" id="btnCheckUpdates" style="font-size:0.85rem;padding:0.4rem 0.9rem;">&#x1F504; Controlla aggiornamenti ora</button>
+                            <span id="updateCheckResult" style="color:var(--text-secondary);font-size:0.8rem;margin-left:0.5rem;"></span>
+                        </div>
+                        <div class="setting-item" style="flex-direction:column;align-items:flex-start;gap:0.2rem;">
+                            <span style="font-size:0.75rem;color:var(--text-secondary);">Versione: <strong id="appVersion">&#x2014;</strong></span>
+                            <span style="font-size:0.75rem;color:var(--text-secondary);">Canale: <strong>Stabile</strong></span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -411,3 +431,4 @@
     </script>
 </body>
 </html>
+

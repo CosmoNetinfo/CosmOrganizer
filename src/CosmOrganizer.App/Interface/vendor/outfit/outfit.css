@@ -1,0 +1,15 @@
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 300 500;
+  font-display: swap;
+  src: url('./Outfit-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+  src: url('./Outfit-SemiBold.ttf') format('truetype');
+}
