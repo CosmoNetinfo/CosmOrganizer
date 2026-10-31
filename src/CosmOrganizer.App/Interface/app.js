@@ -440,7 +440,7 @@ function renderJunk(items) {
     header.style.display = 'flex';
     header.style.justifyContent = 'space-between';
     header.style.marginBottom = '12px';
-    header.innerHTML = `<span>Trovati <b>${junkData.length}</b> file spazzatura</span><button class="btn-action" onclick="recycleJunk()">🗑️ Cestina Selezionati</button>`;
+    header.innerHTML = `<span>Trovati <b>${junkData.length}</b> file spazzatura</span><button class="btn-action" onclick="recycleJunk()"><i class="ph ph-trash"></i> Cestina Selezionati</button>`;
     container.appendChild(header);
 
     junkData.forEach(item => {
@@ -492,7 +492,7 @@ function renderInstallers(items) {
     header.style.display = 'flex';
     header.style.justifyContent = 'space-between';
     header.style.marginBottom = '12px';
-    header.innerHTML = `<span>Rilevati <b>${installersData.length}</b> pacchetti installer</span><button class="btn-action" onclick="recycleInstallers()">🗑️ Cestina Selezionati</button>`;
+    header.innerHTML = `<span>Rilevati <b>${installersData.length}</b> pacchetti installer</span><button class="btn-action" onclick="recycleInstallers()"><i class="ph ph-trash"></i> Cestina Selezionati</button>`;
     container.appendChild(header);
 
     installersData.forEach(item => {
@@ -556,7 +556,7 @@ function renderHistory(results) {
         card.style.marginBottom = '8px';
         card.style.borderRadius = '8px';
 
-        const statusIcon = res.DestinationStillExists ? '✅' : '⚠️';
+        const statusIcon = res.DestinationStillExists ? '<i class="ph-fill ph-check-circle" style="color:var(--neon-green);"></i>' : '<i class="ph-fill ph-warning" style="color:#ffb800;"></i>';
         const dateStr = new Date(res.Timestamp).toLocaleString();
 
         card.innerHTML = `
@@ -615,7 +615,7 @@ function renderRules(rules) {
 
         const testBtn = document.createElement('button');
         testBtn.className = 'btn-browse';
-        testBtn.textContent = '🧪 Prova';
+        testBtn.innerHTML = '<i class="ph ph-flask"></i> Prova';
         testBtn.title = 'Prova questa regola su un file';
         testBtn.onclick = () => {
             if (window.chrome && window.chrome.webview) {

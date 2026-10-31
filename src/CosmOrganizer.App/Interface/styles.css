@@ -785,9 +785,10 @@ body.theme-light .hero-value, body.theme-light .nav-item span { color: var(--tex
     align-items: center;
     justify-content: space-between;
     gap: 15px;
-    padding: 10px 24px;
-    margin: 10px 24px 0 24px;
-    border-radius: 12px;
+    padding: 12px 24px;
+    margin: 0 0 1.5rem 0;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 .profile-select-group {
     display: flex;
@@ -890,3 +891,26 @@ body.theme-light .select-styled {
     transition: opacity 0.2s;
 }
 .btn-action:hover { opacity: 0.85; }
+
+/* Futuristic Button Enhancements */
+.btn-action, .btn-undo, .btn-browse, .btn-preview, .btn-optimize {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.btn-action i, .btn-undo i, .btn-browse i, .btn-preview i {
+    font-size: 1.15rem;
+}
+.btn-undo {
+    background: rgba(255, 60, 60, 0.12) !important;
+    border: 1px solid rgba(255, 60, 60, 0.35) !important;
+    color: #ff6b6b !important;
+    box-shadow: 0 0 12px rgba(255, 60, 60, 0.2);
+}
+.btn-undo:hover {
+    background: rgba(255, 60, 60, 0.25) !important;
+    border-color: #ff6b6b !important;
+    color: #fff !important;
+    box-shadow: 0 0 18px rgba(255, 60, 60, 0.4);
+}
