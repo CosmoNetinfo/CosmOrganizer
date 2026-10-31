@@ -43,6 +43,15 @@ namespace CosmOrganizer
         private readonly RuleEngine _ruleEngine = new();
         private readonly SchedulerService _scheduler = new();
         private readonly OrganizationService _orgService;
+        private readonly DuplicateFinderService _duplicateService;
+        private readonly StorageAnalyzerService _storageService;
+        private readonly ArchiveService _archiveService;
+        private readonly InstallerCleanerService _installerService;
+        private readonly MediaSorterService _mediaService;
+        private readonly BatchRenamerService _renamerService;
+        private readonly JournalSearchService _journalSearchService;
+        private readonly MaintenanceService _maintenanceService;
+        private readonly FolderHealthService _healthService;
         private RealTimeService? _realTime;
 
         // State
@@ -72,6 +81,15 @@ namespace CosmOrganizer
             _profiles = _profileService.Load();
             _activeProfile = _profiles.FirstOrDefault(p => p.Enabled) ?? _profiles.First();
             _orgService = new OrganizationService(_safeFile, _categoryService, _ruleEngine, _journal);
+            _duplicateService = new DuplicateFinderService(_safeFile, _journal);
+            _storageService = new StorageAnalyzerService(_safeFile);
+            _archiveService = new ArchiveService(_safeFile, _journal);
+            _installerService = new InstallerCleanerService(_safeFile, _journal);
+            _mediaService = new MediaSorterService(_safeFile, _journal);
+            _renamerService = new BatchRenamerService(_safeFile, _journal);
+            _journalSearchService = new JournalSearchService(_journal);
+            _maintenanceService = new MaintenanceService(_safeFile, _journal);
+            _healthService = new FolderHealthService(_categoryService, _safeFile);
 
             // 2. Setup Tray Icon
             InitializeTrayIcon();
@@ -258,6 +276,19 @@ namespace CosmOrganizer
                         this.Load += (s, e) => OrganizeActiveProfile();
                     }
                 }
+                else if (arg.Equals("--analyze", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                {
+                    var folder = args[++i];
+                    if (Directory.Exists(folder))
+                    {
+                        this.Load += (s, e) =>
+                        {
+                            var res = _storageService.Analyze(folder);
+                            PostMessage("storageData", res);
+                            _webView?.ExecuteScriptAsync("showView('storage');");
+                        };
+                    }
+                }
                 else if (arg.Equals("--preview", StringComparison.OrdinalIgnoreCase))
                 {
                     this.Load += (s, e) => RequestPreview();
@@ -419,6 +450,105 @@ namespace CosmOrganizer
                 {
                     AddNewRuleDialog();
                 }
+                else if (raw == "findDuplicates")
+                {
+                    Task.Run(() =>
+                    {
+                        var groups = _duplicateService.FindDuplicates(_activeProfile.SourceFolders);
+                        _duplicateService.ApplyAutoSelection(groups, KeepStrategy.KeepOldest);
+                        this.BeginInvoke(new Action(() => PostMessage("duplicatesData", groups)));
+                    });
+                }
+                else if (raw.StartsWith("recycleDuplicates:"))
+                {
+                    var json = raw["recycleDuplicates:".Length..];
+                    var groups = JsonSerializer.Deserialize<List<DuplicateGroup>>(json) ?? new();
+                    _currentRunId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_") + Guid.NewGuid().ToString("N")[..8];
+                    Task.Run(() =>
+                    {
+                        int recycled = _duplicateService.RecycleSelected(groups, _currentRunId);
+                        this.BeginInvoke(new Action(() =>
+                        {
+                            Log($"🗑️ Spostati nel Cestino {recycled} duplicati.");
+                            UpdateUIStats();
+                        }));
+                    });
+                }
+                else if (raw == "analyzeStorage")
+                {
+                    var folder = _activeProfile.SourceFolders.FirstOrDefault() ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    Task.Run(() =>
+                    {
+                        var result = _storageService.Analyze(folder);
+                        this.BeginInvoke(new Action(() => PostMessage("storageData", result)));
+                    });
+                }
+                else if (raw == "scanJunk")
+                {
+                    var folder = _activeProfile.SourceFolders.FirstOrDefault() ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    Task.Run(() =>
+                    {
+                        var candidates = _maintenanceService.ScanForJunk(folder);
+                        this.BeginInvoke(new Action(() => PostMessage("junkData", candidates)));
+                    });
+                }
+                else if (raw.StartsWith("recycleJunk:"))
+                {
+                    var json = raw["recycleJunk:".Length..];
+                    var candidates = JsonSerializer.Deserialize<List<CleanupCandidate>>(json) ?? new();
+                    _currentRunId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_") + Guid.NewGuid().ToString("N")[..8];
+                    Task.Run(() =>
+                    {
+                        int count = _maintenanceService.RecycleJunk(candidates, _currentRunId);
+                        this.BeginInvoke(new Action(() =>
+                        {
+                            Log($"🧹 Eliminati {count} file temporanei/vuoti.");
+                            UpdateUIStats();
+                        }));
+                    });
+                }
+                else if (raw == "cleanInstallers")
+                {
+                    var folder = _activeProfile.SourceFolders.FirstOrDefault() ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    Task.Run(() =>
+                    {
+                        var items = _installerService.Analyze(folder);
+                        this.BeginInvoke(new Action(() => PostMessage("installerData", items)));
+                    });
+                }
+                else if (raw.StartsWith("recycleInstallers:"))
+                {
+                    var json = raw["recycleInstallers:".Length..];
+                    var items = JsonSerializer.Deserialize<List<InstallerItem>>(json) ?? new();
+                    _currentRunId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_") + Guid.NewGuid().ToString("N")[..8];
+                    Task.Run(() =>
+                    {
+                        int count = _installerService.RecycleSelected(items, _currentRunId);
+                        this.BeginInvoke(new Action(() =>
+                        {
+                            Log($"📦 Cestinati {count} vecchi installer.");
+                            UpdateUIStats();
+                        }));
+                    });
+                }
+                else if (raw.StartsWith("searchJournal:"))
+                {
+                    var query = raw["searchJournal:".Length..];
+                    Task.Run(() =>
+                    {
+                        var results = _journalSearchService.FindFile(query);
+                        this.BeginInvoke(new Action(() => PostMessage("whereDidItGoResults", results)));
+                    });
+                }
+                else if (raw.StartsWith("set:contextMenu:"))
+                {
+                    bool enable = raw["set:contextMenu:".Length..] == "true";
+                    if (enable)
+                        WindowsShellIntegration.RegisterContextMenu(Application.ExecutablePath);
+                    else
+                        WindowsShellIntegration.UnregisterContextMenu();
+                    Log(enable ? "Menu contestuale Esplora Risorse registrato." : "Menu contestuale rimosso.");
+                }
                 else if (raw.StartsWith("set:deleteEmpty:"))
                 {
                     _coreSettings.DeleteEmptyFolders = raw["set:deleteEmpty:".Length..] == "true";
@@ -522,6 +652,7 @@ namespace CosmOrganizer
                 // Settings Checkboxes
                 using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run");
                 bool startup = key?.GetValue("CosmOrganizer") != null;
+                bool isCtx = WindowsShellIntegration.IsContextMenuRegistered();
 
                 var jsSettings = $@"
                     setTimeout(() => {{
@@ -530,6 +661,7 @@ namespace CosmOrganizer
                         const chkCmp = document.getElementById('chkCompress');
                         const chkSub = document.getElementById('chkSubfolders');
                         const chkSt  = document.getElementById('chkStartup');
+                        const chkCtx = document.getElementById('chkContextMenu');
                         const selMod = document.getElementById('modeSelect');
 
                         if (chkDel) chkDel.checked = {_activeProfile.DeleteEmptyFolders.ToString().ToLower()};
@@ -537,6 +669,7 @@ namespace CosmOrganizer
                         if (chkCmp) chkCmp.checked = {_activeProfile.CompressOldFiles.ToString().ToLower()};
                         if (chkSub) chkSub.checked = {_activeProfile.IncludeSubfolders.ToString().ToLower()};
                         if (chkSt)  chkSt.checked  = {startup.ToString().ToLower()};
+                        if (chkCtx) chkCtx.checked = {isCtx.ToString().ToLower()};
                         if (selMod) selMod.value   = '{_activeProfile.OrganizeMode}';
                     }}, 100);
                 ";

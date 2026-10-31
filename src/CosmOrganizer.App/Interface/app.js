@@ -4,6 +4,9 @@
 let currentLang = 'it';
 let translations = {};
 let previewData = [];
+let duplicatesData = [];
+let junkData = [];
+let installersData = [];
 
 // Notify backend when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
@@ -76,11 +79,11 @@ function applyThemeFromStorage() {
     applyTheme(saved);
 }
 
-// Navigation Logic
+// --- Navigation Logic ---
 function showView(viewId) {
     document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
     
-    const views = ['dashboard', 'rules', 'preview', 'settings', 'logs'];
+    const views = ['dashboard', 'duplicates', 'storage', 'clean', 'history', 'rules', 'preview', 'settings', 'logs'];
     const navItems = document.querySelectorAll('.nav-item');
     const index = views.indexOf(viewId);
     
@@ -95,6 +98,10 @@ function showView(viewId) {
         if (pageTitle) {
             const titleKeys = {
                 dashboard: 'systemDashboard',
+                duplicates: 'systemDuplicates',
+                storage: 'systemStorage',
+                clean: 'systemClean',
+                history: 'systemHistory',
                 rules: 'systemRules',
                 preview: 'systemPreview',
                 settings: 'systemSettings',
@@ -106,7 +113,7 @@ function showView(viewId) {
     }
 }
 
-// Add Drag & Drop visual feedback
+// Drag & Drop visual feedback
 const dropZone = document.getElementById('dropZone');
 if (dropZone) {
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--neon-green)'; });
@@ -209,6 +216,303 @@ function applyPreviewSelected() {
     }
 }
 
+// --- Duplicates View ---
+function scanDuplicates() {
+    const container = document.getElementById('duplicatesList');
+    if (container) container.innerHTML = '<div style="text-align:center; color: var(--neon-cyan); padding:20px;">Scansione duplicati in corso...</div>';
+    if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage('findDuplicates');
+    }
+}
+
+function renderDuplicates(groups) {
+    duplicatesData = groups || [];
+    const container = document.getElementById('duplicatesList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (duplicatesData.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color: var(--text-secondary); padding:20px;">Nessun duplicato trovato nelle cartelle del profilo attivo!</div>';
+        return;
+    }
+
+    duplicatesData.forEach((grp, gIdx) => {
+        const box = document.createElement('div');
+        box.className = 'glass';
+        box.style.padding = '12px';
+        box.style.marginBottom = '12px';
+        box.style.borderRadius = '8px';
+
+        const sizeMb = (grp.FileSizeBytes / 1048576).toFixed(2);
+        box.innerHTML = `<div style="font-weight:600; color:var(--neon-cyan); margin-bottom:8px;">Gruppo ${gIdx + 1} (${grp.Files.length} copie - ${sizeMb} MB ciascuna)</div>`;
+
+        grp.Files.forEach((f, fIdx) => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '10px';
+            row.style.padding = '4px 0';
+
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.checked = f.SelectedForRecycle;
+            chk.onchange = () => { f.SelectedForRecycle = chk.checked; };
+
+            const pathSpan = document.createElement('span');
+            pathSpan.style.flex = '1';
+            pathSpan.style.fontSize = '0.85rem';
+            pathSpan.textContent = f.Path;
+
+            const dateSpan = document.createElement('span');
+            dateSpan.style.fontSize = '0.75rem';
+            dateSpan.style.color = 'var(--text-secondary)';
+            dateSpan.textContent = new Date(f.LastModified).toLocaleDateString();
+
+            row.appendChild(chk);
+            row.appendChild(pathSpan);
+            row.appendChild(dateSpan);
+            box.appendChild(row);
+        });
+
+        container.appendChild(box);
+    });
+}
+
+function recycleDuplicates() {
+    if (duplicatesData.length === 0) return;
+    if (confirm("Inviare i file duplicati selezionati nel Cestino di Windows?")) {
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.postMessage('recycleDuplicates:' + JSON.stringify(duplicatesData));
+        }
+    }
+}
+
+// --- Storage Analyzer View ---
+function analyzeStorage() {
+    const container = document.getElementById('storageReport');
+    if (container) container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:20px;">Analisi dello spazio disco in corso...</div>';
+    if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage('analyzeStorage');
+    }
+}
+
+function renderStorage(res) {
+    const container = document.getElementById('storageReport');
+    if (!container || !res) return;
+    container.innerHTML = '';
+
+    const totalMb = (res.TotalBytes / 1048576).toFixed(1);
+    const summaryHeader = document.createElement('div');
+    summaryHeader.innerHTML = `<h3>Totale: ${totalMb} MB in ${res.TotalFiles} file</h3>`;
+    container.appendChild(summaryHeader);
+
+    // Subdirectories bars
+    if (res.HeaviestSubdirectories && res.HeaviestSubdirectories.length > 0) {
+        const subSec = document.createElement('div');
+        subSec.innerHTML = `<h4 style="margin: 15px 0 8px 0; color:var(--neon-cyan);">Cartelle più pesanti</h4>`;
+        res.HeaviestSubdirectories.forEach(sub => {
+            const barBox = document.createElement('div');
+            barBox.style.marginBottom = '8px';
+            const sizeStr = (sub.TotalBytes / 1048576).toFixed(1) + ' MB';
+            barBox.innerHTML = `
+                <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+                    <span>${sub.Name} (${sub.FileCount} file)</span>
+                    <span>${sizeStr} (${sub.PercentageOfTotal}%)</span>
+                </div>
+                <div style="background: rgba(255,255,255,0.08); border-radius:4px; height:8px; overflow:hidden; margin-top:2px;">
+                    <div style="background:var(--neon-purple); width:${sub.PercentageOfTotal}%; height:100%;"></div>
+                </div>
+            `;
+            subSec.appendChild(barBox);
+        });
+        container.appendChild(subSec);
+    }
+
+    // Top 10 Largest files
+    if (res.TopLargestFiles && res.TopLargestFiles.length > 0) {
+        const topSec = document.createElement('div');
+        topSec.innerHTML = `<h4 style="margin: 15px 0 8px 0; color:var(--neon-cyan);">I file più grandi</h4>`;
+        const ul = document.createElement('ul');
+        ul.style.listStyle = 'none';
+        ul.style.padding = '0';
+        res.TopLargestFiles.slice(0, 10).forEach(f => {
+            const li = document.createElement('li');
+            li.style.padding = '6px 0';
+            li.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            li.style.display = 'flex';
+            li.style.justifyContent = 'space-between';
+            li.style.fontSize = '0.85rem';
+            li.innerHTML = `<span>${f.Name}</span><span style="color:var(--neon-cyan);">${f.FormattedSize}</span>`;
+            ul.appendChild(li);
+        });
+        topSec.appendChild(ul);
+        container.appendChild(topSec);
+    }
+}
+
+// --- Cleanup View ---
+function scanJunk() {
+    const container = document.getElementById('cleanupList');
+    if (container) container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:20px;">Ricerca file spazzatura in corso...</div>';
+    if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage('scanJunk');
+    }
+}
+
+function scanInstallers() {
+    const container = document.getElementById('cleanupList');
+    if (container) container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:20px;">Ricerca installer vecchi in corso...</div>';
+    if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage('cleanInstallers');
+    }
+}
+
+function renderJunk(items) {
+    junkData = items || [];
+    const container = document.getElementById('cleanupList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (junkData.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding:20px;">Nessun file temporaneo o vuoto rilevato!</div>';
+        return;
+    }
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.marginBottom = '12px';
+    header.innerHTML = `<span>Trovati <b>${junkData.length}</b> file spazzatura</span><button class="btn-action" onclick="recycleJunk()">🗑️ Cestina Selezionati</button>`;
+    container.appendChild(header);
+
+    junkData.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'glass';
+        row.style.padding = '8px 12px';
+        row.style.marginBottom = '6px';
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '10px';
+
+        const chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.checked = item.SelectedForRecycle;
+        chk.onchange = () => { item.SelectedForRecycle = chk.checked; };
+
+        const span = document.createElement('span');
+        span.style.flex = '1';
+        span.style.fontSize = '0.85rem';
+        span.textContent = `${item.Path} (${item.Reason})`;
+
+        row.appendChild(chk);
+        row.appendChild(span);
+        container.appendChild(row);
+    });
+}
+
+function recycleJunk() {
+    if (junkData.length === 0) return;
+    if (confirm("Spostare i file spazzatura selezionati nel Cestino?")) {
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.postMessage('recycleJunk:' + JSON.stringify(junkData));
+        }
+    }
+}
+
+function renderInstallers(items) {
+    installersData = items || [];
+    const container = document.getElementById('cleanupList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (installersData.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding:20px;">Nessun installer vecchio o duplicato rilevato.</div>';
+        return;
+    }
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.marginBottom = '12px';
+    header.innerHTML = `<span>Rilevati <b>${installersData.length}</b> pacchetti installer</span><button class="btn-action" onclick="recycleInstallers()">🗑️ Cestina Selezionati</button>`;
+    container.appendChild(header);
+
+    installersData.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'glass';
+        row.style.padding = '8px 12px';
+        row.style.marginBottom = '6px';
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '10px';
+
+        const chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.checked = item.SelectedForRecycle;
+        chk.onchange = () => { item.SelectedForRecycle = chk.checked; };
+
+        const tag = item.IsOlderVersion ? '<span style="color:#ff6464; font-size:0.75rem;">[Versione Vecchia]</span>' : '';
+        const span = document.createElement('span');
+        span.style.flex = '1';
+        span.style.fontSize = '0.85rem';
+        span.innerHTML = `${item.FileName} ${tag} <span style="color:var(--text-secondary); font-size:0.75rem;">(${new Date(item.LastModified).toLocaleDateString()})</span>`;
+
+        row.appendChild(chk);
+        row.appendChild(span);
+        container.appendChild(row);
+    });
+}
+
+function recycleInstallers() {
+    if (installersData.length === 0) return;
+    if (confirm("Spostare gli installer selezionati nel Cestino?")) {
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.postMessage('recycleInstallers:' + JSON.stringify(installersData));
+        }
+    }
+}
+
+// --- History & "Where did it go?" View ---
+function searchHistoryFile() {
+    const q = document.getElementById('txtSearchHistory')?.value || '';
+    if (!q) return;
+    if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage('searchJournal:' + q);
+    }
+}
+
+function renderHistory(results) {
+    const container = document.getElementById('historyResults');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding:20px;">Nessun record trovato per la ricerca indicata nel journal delle esecuzioni.</div>';
+        return;
+    }
+
+    results.forEach(res => {
+        const card = document.createElement('div');
+        card.className = 'glass';
+        card.style.padding = '10px 14px';
+        card.style.marginBottom = '8px';
+        card.style.borderRadius = '8px';
+
+        const statusIcon = res.DestinationStillExists ? '✅' : '⚠️';
+        const dateStr = new Date(res.Timestamp).toLocaleString();
+
+        card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; font-weight:600; margin-bottom:4px;">
+                <span>${statusIcon} ${res.FileName} (${res.Kind})</span>
+                <span style="font-size:0.75rem; color:var(--text-secondary);">${dateStr}</span>
+            </div>
+            <div style="font-size:0.8rem; color:var(--text-secondary);">Da: ${res.OriginalSource}</div>
+            <div style="font-size:0.8rem; color:var(--neon-green);">A: ${res.FinalDestination || '(Cestino)'}</div>
+        `;
+        container.appendChild(card);
+    });
+}
+
 // --- Rules Engine UI ---
 function renderRules(rules) {
     const container = document.getElementById('rulesList');
@@ -298,6 +602,21 @@ function handleMessage(msg) {
         case 'rules':
             renderRules(payload);
             break;
+        case 'duplicatesData':
+            renderDuplicates(payload);
+            break;
+        case 'storageData':
+            renderStorage(payload);
+            break;
+        case 'junkData':
+            renderJunk(payload);
+            break;
+        case 'installerData':
+            renderInstallers(payload);
+            break;
+        case 'whereDidItGoResults':
+            renderHistory(payload);
+            break;
         case 'log':
             addLog(payload);
             break;
@@ -307,7 +626,7 @@ function handleMessage(msg) {
     }
 }
 
-// --- Functions called by C# or legacy calls ---
+// Functions called by C# or legacy calls
 function updateProgress(percent, label) {
     const effVal = document.getElementById('efficiencyVal');
     if (effVal) effVal.innerHTML = percent + '<span class="percent">%</span>';
