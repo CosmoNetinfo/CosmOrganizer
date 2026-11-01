@@ -1,4 +1,4 @@
-// CosmOrganizer Interface Client Script
+﻿// CosmOrganizer Interface Client Script
 // © CosmoNet.info — MIT License
 
 let currentLang = localStorage.getItem('cosmo_lang') || 'it';
@@ -566,11 +566,50 @@ function onCleanTargetChanged() {
 }
 
 // --- Storage Analyzer View ---
-function analyzeStorage() {
+let _storageProgressTimer = null;
+
+function _startStorageProgress() {
     const container = document.getElementById('storageReport');
-    if (container) {
-        container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:30px;"><i class="ph ph-circle-notch ph-spin" style="font-size:2rem; margin-bottom:10px; display:block;"></i>Analisi dello spazio disco in corso...</div>';
+    if (!container) return;
+    container.innerHTML = `
+        <div class="storage-progress-wrap">
+            <i class="ph ph-magnifying-glass scan-icon"></i>
+            <div class="storage-progress-pct" id="storagePct">0%</div>
+            <div class="storage-progress-bar-bg">
+                <div class="storage-progress-bar-fill" id="storageBarFill"></div>
+            </div>
+            <div class="storage-progress-label">Scansione file in corso...</div>
+        </div>`;
+    let pct = 0;
+    if (_storageProgressTimer) clearInterval(_storageProgressTimer);
+    // Animate 0 -> 90% over ~8 s using easing (steps every 200 ms)
+    _storageProgressTimer = setInterval(() => {
+        if (pct < 90) {
+            pct += (90 - pct) * 0.035;
+            _setStorageProgressPct(Math.floor(pct));
+        }
+    }, 200);
+}
+
+function _setStorageProgressPct(pct) {
+    const bar   = document.getElementById('storageBarFill');
+    const label = document.getElementById('storagePct');
+    if (bar)   bar.style.width   = pct + '%';
+    if (label) label.textContent = pct + '%';
+}
+
+function _finishStorageProgress(callback) {
+    if (_storageProgressTimer) {
+        clearInterval(_storageProgressTimer);
+        _storageProgressTimer = null;
     }
+    _setStorageProgressPct(100);
+    // Brief pause at 100% before rendering results
+    setTimeout(() => { if (callback) callback(); }, 350);
+}
+
+function analyzeStorage() {
+    _startStorageProgress();
     const target = selectedStorageTarget || document.getElementById('storageTargetSelect')?.value || '';
     if (window.chrome && window.chrome.webview) {
         window.chrome.webview.postMessage('analyzeStorage:' + target);
@@ -578,8 +617,13 @@ function analyzeStorage() {
 }
 
 function renderStorage(res) {
+    if (!res) return;
+    _finishStorageProgress(() => _doRenderStorage(res));
+}
+
+function _doRenderStorage(res) {
     const container = document.getElementById('storageReport');
-    if (!container || !res) return;
+    if (!container) return;
     container.innerHTML = '';
 
     const rootName = res.RootFolder ? ` su <b>${res.RootFolder}</b>` : '';

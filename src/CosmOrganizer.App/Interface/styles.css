@@ -1061,3 +1061,50 @@ body.theme-light .clean-success-banner {
 body.theme-light .clean-success-banner i {
     color: #10b981;
 }
+
+/* Storage analysis progress bar */
+.storage-progress-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 40px 30px;
+    text-align: center;
+}
+.storage-progress-wrap .scan-icon {
+    font-size: 2.4rem;
+    color: var(--neon-cyan);
+    animation: spin 1.2s linear infinite;
+}
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+.storage-progress-label {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    letter-spacing: 0.02em;
+}
+.storage-progress-pct {
+    color: var(--neon-cyan);
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 4ch;
+    text-align: center;
+}
+.storage-progress-bar-bg {
+    width: 100%;
+    max-width: 420px;
+    height: 10px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+.storage-progress-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-blue));
+    transition: width 0.4s ease;
+    width: 0%;
+}
