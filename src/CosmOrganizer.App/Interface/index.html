@@ -200,8 +200,8 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <h2 data-i18n="duplicatesTitle">Ricerca File Duplicati</h2>
                         <div style="display: flex; gap: 10px;">
-                            <button class="btn-action" onclick="scanDuplicates()" data-i18n="scanDuplicates">🔍 Scansiona</button>
-                            <button class="btn-undo" onclick="recycleDuplicates()" data-i18n="recycleSelected">🗑️ Cestina</button>
+                            <button class="btn-action" onclick="scanDuplicates()"><i class="ph ph-radar"></i> <span data-i18n="scanDuplicates">Scansiona</span></button>
+                            <button class="btn-undo" onclick="recycleDuplicates()"><i class="ph ph-trash"></i> <span data-i18n="recycleSelected">Cestina</span></button>
                         </div>
                     </div>
                     <div id="duplicatesList" class="preview-container">
@@ -217,7 +217,7 @@
                 <div class="glass-panel full-height">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <h2 data-i18n="storageTitle">Analisi Utilizzo Spazio Disco</h2>
-                        <button class="btn-action" onclick="analyzeStorage()" data-i18n="scanStorage">📊 Analizza Cartella</button>
+                        <button class="btn-action" onclick="analyzeStorage()"><i class="ph ph-chart-donut"></i> <span data-i18n="scanStorage">Analizza Spazio</span></button>
                     </div>
                     <div id="storageReport" class="preview-container">
                         <div style="text-align: center; color: var(--text-secondary); padding: 30px;">
@@ -233,8 +233,8 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <h2 data-i18n="cleanTitle">Pulizia File Spazzatura & Installer</h2>
                         <div style="display: flex; gap: 10px;">
-                            <button class="btn-action" onclick="scanJunk()" data-i18n="scanJunk">🧹 Cerca File Vuoti & Temp</button>
-                            <button class="btn-action" onclick="scanInstallers()" data-i18n="scanInstallers">📦 Installer Vecchi</button>
+                            <button class="btn-action" onclick="scanJunk()"><i class="ph ph-broom"></i> <span data-i18n="scanJunk">Cerca File Temp</span></button>
+                            <button class="btn-action" onclick="scanInstallers()"><i class="ph ph-package"></i> <span data-i18n="scanInstallers">Cerca Installer</span></button>
                         </div>
                     </div>
                     <div id="cleanupList" class="preview-container">
@@ -252,7 +252,7 @@
                         <h2 data-i18n="historyTitle">Cronologia & "Dov'è finito?"</h2>
                         <div style="display: flex; gap: 10px; flex: 1; max-width: 400px;">
                             <input type="text" id="txtSearchHistory" class="select-styled" style="flex:1;" placeholder="Cerca per nome file..." onkeyup="if(event.key==='Enter') searchHistoryFile()">
-                            <button class="btn-action" onclick="searchHistoryFile()">🔎 Cerca</button>
+                            <button class="btn-action" onclick="searchHistoryFile()"><i class="ph ph-magnifying-glass"></i> <span>Cerca</span></button>
                         </div>
                     </div>
                     <div id="historyResults" class="preview-container">
@@ -266,7 +266,7 @@
                 <div class="glass-panel full-height">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <h2 data-i18n="rulesTitle">Regole Personalizzate</h2>
-                        <button class="btn-action" onclick="window.chrome.webview.postMessage('addRule')" data-i18n="addRule">+ Nuova Regola</button>
+                        <button class="btn-action" onclick="window.chrome.webview.postMessage('addRule')"><i class="ph ph-plus-circle"></i> <span data-i18n="addRule">Nuova Regola</span></button>
                     </div>
                     <div id="rulesList" class="rules-container">
                         <!-- Loaded dynamically -->
@@ -279,7 +279,7 @@
                 <div class="glass-panel full-height">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <h2 data-i18n="previewTitle">Anteprima Organizzazione File</h2>
-                        <button class="btn-action" onclick="applyPreviewSelected()" data-i18n="previewApply">Applica Selezionati</button>
+                        <button class="btn-action" onclick="applyPreviewSelected()"><i class="ph ph-check-circle"></i> <span data-i18n="previewApply">Applica Selezionati</span></button>
                     </div>
                     <div class="preview-container">
                         <table class="preview-table">
@@ -381,7 +381,7 @@
                             </label>
                         </div>
                         <div class="setting-item">
-                            <button class="btn-action" onclick="checkUpdatesManual()" id="btnCheckUpdates" style="font-size:0.85rem;padding:0.4rem 0.9rem;">&#x1F504; Controlla aggiornamenti ora</button>
+                            <button class="btn-action" onclick="checkUpdatesManual()" id="btnCheckUpdates" style="font-size:0.85rem;padding:0.4rem 0.9rem;"><i class="ph ph-arrows-clockwise"></i> Controlla aggiornamenti ora</button>
                             <span id="updateCheckResult" style="color:var(--text-secondary);font-size:0.8rem;margin-left:0.5rem;"></span>
                         </div>
                         <div class="setting-item" style="flex-direction:column;align-items:flex-start;gap:0.2rem;">
