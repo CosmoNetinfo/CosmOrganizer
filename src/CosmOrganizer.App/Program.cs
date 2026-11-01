@@ -1,4 +1,4 @@
-﻿// CosmOrganizer - Main Application & Form
+// CosmOrganizer - Main Application & Form
 // WinForms + WebView2 host for modern HTML interface.
 // © CosmoNet.info — MIT License
 
@@ -418,8 +418,7 @@ namespace CosmOrganizer
             _webView.NavigationCompleted += (s, e) =>
             {
                 UpdateUIStats();
-                var ver = typeof(CosmOrganizerForm).Assembly.GetName().Version;
-                string verStr = ver != null ? $"{ver.Major}.{ver.Minor}" : "3.3";
+                string verStr = GetAppVersionString();
                 _webView.ExecuteScriptAsync($"setAppVersion('{verStr}');");
             };
 
@@ -685,6 +684,23 @@ namespace CosmOrganizer
                 {
                     _updateService?.RestartAndApply();
                 }
+                else if (raw == "checkUpdates")
+                {
+                    Task.Run(async () =>
+                    {
+                        string result = _updateService != null
+                            ? await _updateService.CheckForUpdatesManualAsync()
+                            : "Modulo aggiornamenti non disponibile.";
+                        this.BeginInvoke(new Action(() => PostMessage("updateCheckResult", result)));
+                    });
+                }
+                else if (raw.StartsWith("set:autoUpdate:"))
+                {
+                    bool enabled = raw["set:autoUpdate:".Length..] == "true";
+                    _coreSettings.AutoUpdateEnabled = enabled;
+                    SaveCoreSettings();
+                    Log(enabled ? "Aggiornamenti automatici attivati." : "Aggiornamenti automatici disattivati.");
+                }
                 else if (raw == "close")
                 {
                     this.Close();
@@ -745,9 +761,11 @@ namespace CosmOrganizer
                         const chkSub = document.getElementById('chkSubfolders');
                         const chkSt  = document.getElementById('chkStartup');
                         const chkCtx = document.getElementById('chkContextMenu');
+                        const chkAuto = document.getElementById('chkAutoUpdate');
                         const selMod = document.getElementById('modeSelect');
 
                         if (chkDel) chkDel.checked = {_activeProfile.DeleteEmptyFolders.ToString().ToLower()};
+                        if (chkAuto) chkAuto.checked = {_coreSettings.AutoUpdateEnabled.ToString().ToLower()};
                         if (chkDup) chkDup.checked = {_activeProfile.DeleteDuplicates.ToString().ToLower()};
                         if (chkCmp) chkCmp.checked = {_activeProfile.CompressOldFiles.ToString().ToLower()};
                         if (chkSub) chkSub.checked = {_activeProfile.IncludeSubfolders.ToString().ToLower()};
@@ -1157,6 +1175,24 @@ namespace CosmOrganizer
                 SaveCoreSettings();
             }
             catch { }
+        }
+
+
+        private static string GetAppVersionString()
+        {
+            try
+            {
+                var verFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "version.txt");
+                if (File.Exists(verFile))
+                {
+                    var text = File.ReadAllText(verFile).Trim();
+                    if (!string.IsNullOrWhiteSpace(text)) return text;
+                }
+                var ver = typeof(CosmOrganizerForm).Assembly.GetName().Version;
+                if (ver != null && ver.Major > 1) return $"{ver.Major}.{ver.Minor}";
+            }
+            catch { }
+            return "4.0";
         }
 
         private void OnFormClosing(object? sender, FormClosingEventArgs e)

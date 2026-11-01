@@ -26,40 +26,40 @@
             </div>
             
             <div class="nav-menu">
-                <a href="#" class="nav-item active" onclick="showView('dashboard')">
+                <a href="javascript:void(0)" class="nav-item active" onclick="showView('dashboard')">
                     <i class="ph ph-house"></i>
                     <span data-i18n="navDashboard">Dashboard</span>
                     <div class="glow-bar"></div>
                 </a>
-                <a href="#" class="nav-item" onclick="showView('duplicates')">
+                <a href="javascript:void(0)" class="nav-item" onclick="showView('duplicates')">
                     <i class="ph ph-copy"></i>
                     <span data-i18n="navDuplicates">Duplicati</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showView('storage')">
+                <a href="javascript:void(0)" class="nav-item" onclick="showView('storage')">
                     <i class="ph ph-chart-pie"></i>
                     <span data-i18n="navStorage">Spazio</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showView('clean')">
+                <a href="javascript:void(0)" class="nav-item" onclick="showView('clean')">
                     <i class="ph ph-broom"></i>
                     <span data-i18n="navClean">Pulizia</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showView('history')">
+                <a href="javascript:void(0)" class="nav-item" onclick="showView('history')">
                     <i class="ph ph-clock-counter-clockwise"></i>
                     <span data-i18n="navHistory">Dov'è finito?</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showView('rules')">
+                <a href="javascript:void(0)" class="nav-item" onclick="showView('rules')">
                     <i class="ph ph-sliders"></i>
                     <span data-i18n="navRules">Regole</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showView('preview')">
+                <a href="javascript:void(0)" class="nav-item" onclick="showView('preview')">
                     <i class="ph ph-eye"></i>
                     <span data-i18n="navPreview">Anteprima</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showView('settings')">
+                <a href="javascript:void(0)" class="nav-item" onclick="showView('settings')">
                     <i class="ph ph-gear"></i>
                     <span data-i18n="navSettings">Impostazioni</span>
                 </a>
-                <a href="#" class="nav-item" onclick="showView('logs')">
+                <a href="javascript:void(0)" class="nav-item" onclick="showView('logs')">
                     <i class="ph ph-list-bullets"></i>
                     <span data-i18n="navLogs">Registro</span>
                 </a>
@@ -76,11 +76,7 @@
             <!-- Header -->
             <header class="top-bar">
                 <div class="breadcrumbs" id="pageTitle" data-i18n="systemDashboard">Sistema / Dashboard</div>
-                <div class="window-controls">
-                    <button class="win-btn minimize" onclick="window.chrome.webview.postMessage('minimize')"><i class="ph ph-minus"></i></button>
-                    <button class="win-btn close" onclick="window.chrome.webview.postMessage('close')"><i class="ph ph-x"></i></button>
-                </div>
-            </header>
+                </header>
 
             <div id="updateBanner" class="update-banner" style="display:none;">
                 <i class="ph ph-sparkle"></i>
@@ -161,7 +157,7 @@
                     <div class="glass" style="display: inline-flex; align-items: center; gap: 15px; padding: 10px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
                         <span style="color: var(--text-secondary); font-size: 0.85rem;" data-i18n="destination">Destinazione:</span>
                         <span id="destPath" style="color: var(--neon-cyan); font-weight: 500; font-size: 0.9rem;" data-i18n="notSelected">Non selezionata (sottocartelle)</span>
-                        <button class="btn-browse" onclick="window.chrome.webview.postMessage('setDest')" title="Scegli cartella di destinazione" style="padding: 2px 8px;" data-i18n="browse">📁 Sfoglia</button>
+                        <button class="btn-browse" onclick="window.chrome.webview.postMessage('setDest')" title="Scegli cartella di destinazione" style="padding: 4px 10px; display: inline-flex; align-items: center; gap: 6px;"><i class="ph ph-folder-open"></i> <span data-i18n="browse">Sfoglia</span></button>
                     </div>
                 </section>
 
@@ -385,7 +381,7 @@
                             <span id="updateCheckResult" style="color:var(--text-secondary);font-size:0.8rem;margin-left:0.5rem;"></span>
                         </div>
                         <div class="setting-item" style="flex-direction:column;align-items:flex-start;gap:0.2rem;">
-                            <span style="font-size:0.75rem;color:var(--text-secondary);">Versione: <strong id="appVersion">&#x2014;</strong></span>
+                            <span style="font-size:0.75rem;color:var(--text-secondary);">Versione: <strong id="settingsAppVersion">&#x2014;</strong></span>
                             <span style="font-size:0.75rem;color:var(--text-secondary);">Canale: <strong>Stabile</strong></span>
                         </div>
                     </div>

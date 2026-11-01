@@ -787,6 +787,8 @@ function toggleSetting(name, value) {
 function setAppVersion(v) {
     const el = document.getElementById('appVersion') || document.querySelector('.version-tag');
     if (el) el.textContent = 'v' + v;
+    const settingsEl = document.getElementById('settingsAppVersion');
+    if (settingsEl) settingsEl.textContent = 'v' + v;
 }
 
 function showUpdateBanner(v) {
