@@ -917,3 +917,147 @@ body.theme-light .select-styled {
     color: #fff !important;
     box-shadow: 0 0 18px rgba(255, 60, 60, 0.4);
 }
+
+
+/* --- Drives Grid & Cards --- */
+.drives-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.drive-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    user-select: none;
+}
+.drive-card:hover {
+    border-color: rgba(0, 240, 255, 0.5);
+    background: rgba(0, 240, 255, 0.04);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+.drive-card.selected {
+    border-color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.09);
+    box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+}
+.drive-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.drive-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+.drive-card-title i {
+    font-size: 1.25rem;
+    color: var(--neon-cyan);
+}
+.drive-type-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+.drive-card.selected .drive-type-badge {
+    background: rgba(0, 240, 255, 0.2);
+    color: var(--neon-cyan);
+}
+.drive-bar-bg {
+    height: 7px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+.drive-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--neon-cyan);
+    transition: width 0.4s ease;
+}
+.drive-bar-fill.warn {
+    background: #ffaa00;
+}
+.drive-bar-fill.danger {
+    background: #ff4444;
+}
+.drive-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+.drive-free {
+    color: var(--neon-cyan);
+    font-weight: 500;
+}
+
+/* Light theme drive cards */
+body.theme-light .drive-card {
+    background: #ffffff;
+    border-color: #e2e8f0;
+}
+body.theme-light .drive-card:hover {
+    border-color: #0284c7;
+    background: #f0f9ff;
+}
+body.theme-light .drive-card.selected {
+    border-color: #0284c7;
+    background: #e0f2fe;
+    box-shadow: 0 0 12px rgba(2, 132, 199, 0.2);
+}
+body.theme-light .drive-card-title i {
+    color: #0284c7;
+}
+body.theme-light .drive-free {
+    color: #0284c7;
+}
+body.theme-light .drive-bar-bg {
+    background: #e2e8f0;
+}
+body.theme-light .drive-bar-fill {
+    background: #0284c7;
+}
+
+/* Clean success banner */
+.clean-success-banner {
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid var(--neon-cyan);
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    animation: fadeIn 0.3s ease;
+}
+.clean-success-banner i {
+    font-size: 1.3rem;
+    color: var(--neon-cyan);
+}
+body.theme-light .clean-success-banner {
+    background: #ecfdf5;
+    border-color: #10b981;
+    color: #065f46;
+}
+body.theme-light .clean-success-banner i {
+    color: #10b981;
+}

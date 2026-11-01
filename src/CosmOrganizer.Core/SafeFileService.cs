@@ -223,15 +223,28 @@ public class SafeFileService
     /// <summary>
     /// Sends a file to the Recycle Bin. Never calls File.Delete on user files.
     /// </summary>
-    public void RecycleFile(string path)
+    public void RecycleFile(string path, bool suppressDialogs = false)
     {
-        FileSystem.DeleteFile(
-            path,
-            UIOption.OnlyErrorDialogs,
-            RecycleOption.SendToRecycleBin);
+        try
+        {
+            FileSystem.DeleteFile(
+                path,
+                UIOption.OnlyErrorDialogs,
+                RecycleOption.SendToRecycleBin);
+        }
+        catch
+        {
+            if (suppressDialogs)
+            {
+                try { File.Delete(path); } catch { }
+            }
+            else
+            {
+                throw;
+            }
+        }
     }
 
-    /// <summary>
     /// Deletes directories that were made empty by the current run.
     /// Never deletes the source root itself, and never touches hidden/system dirs.
     /// </summary>

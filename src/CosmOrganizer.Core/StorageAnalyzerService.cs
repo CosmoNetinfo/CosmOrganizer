@@ -29,6 +29,8 @@ public class DirectoryStorageSummary
 
 public class StorageAnalysisResult
 {
+    public string RootFolder { get; set; } = string.Empty;
+    public string FormattedTotalSize => DriveHelper.FormatBytes(TotalBytes);
     public long TotalBytes { get; set; }
     public int TotalFiles { get; set; }
     public List<StorageItem> TopLargestFiles { get; set; } = new();
@@ -50,7 +52,7 @@ public class StorageAnalyzerService
         int inactiveDaysThreshold = 90,
         int topFileCount = 100)
     {
-        var result = new StorageAnalysisResult();
+        var result = new StorageAnalysisResult { RootFolder = rootFolder };
         if (!Directory.Exists(rootFolder)) return result;
 
         var opts = new EnumerationOptions

@@ -73,5 +73,16 @@
   "scanJunk": "Find Temp Files",
   "scanInstallers": "Find Installers",
   "historyTitle": "History & 'Where did it go?'",
-  "searchFile": "Search by filename..."
+  "searchFile": "Search by filename...",
+  "installedDrives": "Installed Drives in PC",
+  "selectDriveToClean": "Disks & Scan Locations",
+  "deleteSelected": "Delete Selected",
+  "deleteTempFiles": "Delete Selected Files",
+  "systemTemp": "System & User Temp Files (%TEMP%)",
+  "allDrives": "All Drives",
+  "activeProfileFolder": "Active Profile Folder",
+  "revealInExplorer": "Show in Windows Explorer",
+  "cleanSuccess": "Cleanup completed successfully!",
+  "freeOf": "free of",
+  "used": "used"
 }

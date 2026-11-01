@@ -420,6 +420,8 @@ namespace CosmOrganizer
                 UpdateUIStats();
                 string verStr = GetAppVersionString();
                 _webView.ExecuteScriptAsync($"setAppVersion('{verStr}');");
+                var drives = DriveHelper.GetSystemDrives();
+                PostMessage("drivesData", drives);
             };
 
             // Drag and Drop folder support
@@ -554,21 +556,38 @@ namespace CosmOrganizer
                         }));
                     });
                 }
-                else if (raw == "analyzeStorage")
+                else if (raw == "getDrives")
                 {
-                    var folder = _activeProfile.SourceFolders.FirstOrDefault() ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    var drives = DriveHelper.GetSystemDrives();
+                    this.BeginInvoke(new Action(() => PostMessage("drivesData", drives)));
+                }
+                else if (raw == "analyzeStorage" || raw.StartsWith("analyzeStorage:"))
+                {
+                    var target = raw.StartsWith("analyzeStorage:")
+                        ? raw["analyzeStorage:".Length..].Trim()
+                        : "";
+                    if (string.IsNullOrWhiteSpace(target))
+                    {
+                        target = _activeProfile.SourceFolders.FirstOrDefault() ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    }
                     Task.Run(() =>
                     {
-                        var result = _storageService.Analyze(folder);
+                        var result = _storageService.Analyze(target);
                         this.BeginInvoke(new Action(() => PostMessage("storageData", result)));
                     });
                 }
-                else if (raw == "scanJunk")
+                else if (raw == "scanJunk" || raw.StartsWith("scanJunk:"))
                 {
-                    var folder = _activeProfile.SourceFolders.FirstOrDefault() ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    var target = raw.StartsWith("scanJunk:")
+                        ? raw["scanJunk:".Length..].Trim()
+                        : "";
+                    if (string.IsNullOrWhiteSpace(target))
+                    {
+                        target = "SYSTEM_TEMP";
+                    }
                     Task.Run(() =>
                     {
-                        var candidates = _maintenanceService.ScanForJunk(folder);
+                        var candidates = _maintenanceService.ScanForJunk(target);
                         this.BeginInvoke(new Action(() => PostMessage("junkData", candidates)));
                     });
                 }
@@ -579,20 +598,28 @@ namespace CosmOrganizer
                     _currentRunId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_") + Guid.NewGuid().ToString("N")[..8];
                     Task.Run(() =>
                     {
-                        int count = _maintenanceService.RecycleJunk(candidates, _currentRunId);
+                        var res = _maintenanceService.RecycleJunkWithDetails(candidates, _currentRunId);
+                        for (int k = 0; k < res.Count; k++) _sessionDeleted.Add("temp");
                         this.BeginInvoke(new Action(() =>
                         {
-                            Log($"🧹 Eliminati {count} file temporanei/vuoti.");
+                            Log($"🧹 Eliminati {res.Count} file temporanei/vuoti ({res.FormattedBytes} liberati).");
                             UpdateUIStats();
+                            PostMessage("junkCleaned", res);
                         }));
                     });
                 }
-                else if (raw == "cleanInstallers")
+                else if (raw == "cleanInstallers" || raw.StartsWith("cleanInstallers:"))
                 {
-                    var folder = _activeProfile.SourceFolders.FirstOrDefault() ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    var target = raw.StartsWith("cleanInstallers:")
+                        ? raw["cleanInstallers:".Length..].Trim()
+                        : "";
+                    if (string.IsNullOrWhiteSpace(target))
+                    {
+                        target = _activeProfile.SourceFolders.FirstOrDefault() ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    }
                     Task.Run(() =>
                     {
-                        var items = _installerService.Analyze(folder);
+                        var items = _installerService.Analyze(target);
                         this.BeginInvoke(new Action(() => PostMessage("installerData", items)));
                     });
                 }
@@ -603,13 +630,32 @@ namespace CosmOrganizer
                     _currentRunId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_") + Guid.NewGuid().ToString("N")[..8];
                     Task.Run(() =>
                     {
+                        long bytesFreed = items.Where(it => it.SelectedForRecycle).Sum(it => it.Bytes);
                         int count = _installerService.RecycleSelected(items, _currentRunId);
+                        for (int k = 0; k < count; k++) _sessionDeleted.Add("installer");
                         this.BeginInvoke(new Action(() =>
                         {
-                            Log($"📦 Cestinati {count} vecchi installer.");
+                            Log($"📦 Cestinati {count} vecchi installer ({DriveHelper.FormatBytes(bytesFreed)} liberati).");
                             UpdateUIStats();
+                            PostMessage("installersCleaned", new { count, bytesFreed, formattedBytes = DriveHelper.FormatBytes(bytesFreed) });
                         }));
                     });
+                }
+                else if (raw.StartsWith("revealFile:"))
+                {
+                    var filePath = raw["revealFile:".Length..].Trim();
+                    try
+                    {
+                        if (File.Exists(filePath))
+                        {
+                            Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+                        }
+                        else if (Directory.Exists(filePath))
+                        {
+                            Process.Start("explorer.exe", $"\"{filePath}\"");
+                        }
+                    }
+                    catch { }
                 }
                 else if (raw.StartsWith("searchJournal:"))
                 {

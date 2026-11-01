@@ -211,13 +211,33 @@
             <!-- VIEW: STORAGE -->
             <div id="view-storage" class="view-section" style="display:none">
                 <div class="glass-panel full-height">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                        <h2 data-i18n="storageTitle">Analisi Utilizzo Spazio Disco</h2>
-                        <button class="btn-action" onclick="analyzeStorage()"><i class="ph ph-chart-donut"></i> <span data-i18n="scanStorage">Analizza Spazio</span></button>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h2 data-i18n="storageTitle">Analisi Utilizzo Spazio Disco</h2>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Visualizza i dischi installati e analizza i file più pesanti per disco o cartella.</div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <select id="storageTargetSelect" class="select-styled" onchange="onStorageTargetChanged()" style="min-width: 170px;">
+                                <option value="">Caricamento dischi...</option>
+                            </select>
+                            <button class="btn-action" onclick="analyzeStorage()"><i class="ph ph-chart-donut"></i> <span data-i18n="scanStorage">Analizza Spazio</span></button>
+                            <button class="btn-action" onclick="refreshDrives()" title="Ricarica dischi" style="padding: 8px 12px;"><i class="ph ph-arrows-clockwise"></i></button>
+                        </div>
                     </div>
+
+                    <!-- Installed Disks Section -->
+                    <div style="margin-bottom: 12px;">
+                        <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--neon-cyan); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                            <i class="ph ph-hard-drives"></i> <span data-i18n="installedDrives">Dischi Installati nel PC</span>
+                        </div>
+                        <div id="storageDrivesContainer" class="drives-grid">
+                            <!-- Populated dynamically with drive cards -->
+                        </div>
+                    </div>
+
                     <div id="storageReport" class="preview-container">
                         <div style="text-align: center; color: var(--text-secondary); padding: 30px;">
-                            Analizza i file più pesanti e l'occupazione per sottocartella del profilo attivo.
+                            Seleziona un disco o una cartella e clicca "Analizza Spazio" per visualizzare le cartelle più pesanti e i file più grandi.
                         </div>
                     </div>
                 </div>
@@ -226,16 +246,34 @@
             <!-- VIEW: CLEANUP -->
             <div id="view-clean" class="view-section" style="display:none">
                 <div class="glass-panel full-height">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                        <h2 data-i18n="cleanTitle">Pulizia File Spazzatura & Installer</h2>
-                        <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h2 data-i18n="cleanTitle">Pulizia File Spazzatura & Installer</h2>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Scansiona ed elimina file temporanei, vuoti (0 byte), log, dump o vecchi pacchetti installer.</div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <select id="cleanTargetSelect" class="select-styled" onchange="onCleanTargetChanged()" style="min-width: 220px;">
+                                <option value="SYSTEM_TEMP">File Temporanei di Sistema & Utente</option>
+                            </select>
                             <button class="btn-action" onclick="scanJunk()"><i class="ph ph-broom"></i> <span data-i18n="scanJunk">Cerca File Temp</span></button>
                             <button class="btn-action" onclick="scanInstallers()"><i class="ph ph-package"></i> <span data-i18n="scanInstallers">Cerca Installer</span></button>
+                            <button id="btnCleanAction" class="btn-undo" onclick="executeCleanSelected()" title="Elimina i file trovati e selezionati"><i class="ph ph-trash"></i> <span id="lblCleanAction" data-i18n="deleteSelected">Cancella Selezionati</span></button>
                         </div>
                     </div>
+
+                    <!-- Clean Locations & Drives Section -->
+                    <div style="margin-bottom: 12px;">
+                        <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--neon-cyan); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                            <i class="ph ph-hard-drives"></i> <span data-i18n="selectDriveToClean">Dischi & Posizioni di Scansione</span>
+                        </div>
+                        <div id="cleanDrivesContainer" class="drives-grid">
+                            <!-- Populated dynamically with System Temp card + Drive cards -->
+                        </div>
+                    </div>
+
                     <div id="cleanupList" class="preview-container">
                         <div style="text-align: center; color: var(--text-secondary); padding: 30px;">
-                            Scansiona ed elimina in sicurezza (nel Cestino) file temporanei, vuoti (0 byte) o vecchi installer.
+                            Scegli un disco o i file temporanei di sistema, quindi clicca "Cerca File Temp" o "Cerca Installer".
                         </div>
                     </div>
                 </div>

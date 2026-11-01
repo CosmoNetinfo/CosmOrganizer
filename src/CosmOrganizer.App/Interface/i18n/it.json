@@ -73,5 +73,16 @@
   "scanJunk": "Cerca File Temp",
   "scanInstallers": "Cerca Installer",
   "historyTitle": "Cronologia & 'Dov'è finito?'",
-  "searchFile": "Cerca per nome file..."
+  "searchFile": "Cerca per nome file...",
+  "installedDrives": "Dischi Installati nel PC",
+  "selectDriveToClean": "Dischi & Posizioni di Scansione",
+  "deleteSelected": "Cancella Selezionati",
+  "deleteTempFiles": "Cancella File Selezionati",
+  "systemTemp": "File Temporanei di Sistema & Utente (%TEMP%)",
+  "allDrives": "Tutti i Dischi",
+  "activeProfileFolder": "Cartella Profilo Attivo",
+  "revealInExplorer": "Mostra in Esplora Risorse",
+  "cleanSuccess": "Pulizia completata con successo!",
+  "freeOf": "liberi su",
+  "used": "usati"
 }

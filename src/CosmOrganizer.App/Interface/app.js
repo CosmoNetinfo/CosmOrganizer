@@ -7,6 +7,10 @@ let previewData = [];
 let duplicatesData = [];
 let junkData = [];
 let installersData = [];
+let systemDrives = [];
+let selectedStorageTarget = '';
+let selectedCleanTarget = 'SYSTEM_TEMP';
+let currentCleanMode = 'junk';
 
 // Notify backend when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
@@ -20,6 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.chrome.webview.addEventListener('message', event => {
             if (event.data) handleMessage(event.data);
         });
+        loadDrives();
 
 // Keyboard Shortcuts & Function Keys
 window.addEventListener('keydown', (e) => {
@@ -167,6 +172,10 @@ function showView(viewId) {
         };
         const key = titleKeys[viewId];
         pageTitle.textContent = translations[key] || ('System / ' + viewId);
+    }
+
+    if ((viewId === 'storage' || viewId === 'clean') && (!systemDrives || systemDrives.length === 0)) {
+        loadDrives();
     }
 }
 
@@ -345,12 +354,226 @@ function recycleDuplicates() {
     }
 }
 
+// --- System Drives Management ---
+function loadDrives() {
+    if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage('getDrives');
+    }
+}
+
+function refreshDrives() {
+    loadDrives();
+}
+
+function renderDrives(drives) {
+    systemDrives = drives || [];
+    renderStorageDrives();
+    renderCleanDrives();
+}
+
+function renderStorageDrives() {
+    const container = document.getElementById('storageDrivesContainer');
+    const select = document.getElementById('storageTargetSelect');
+    if (!container || !select) return;
+
+    // 1. Populate Dropdown
+    select.innerHTML = '';
+    const activeProfOpt = document.createElement('option');
+    activeProfOpt.value = '';
+    activeProfOpt.textContent = '📁 ' + (translations['activeProfileFolder'] || 'Cartella Profilo Attivo');
+    select.appendChild(activeProfOpt);
+
+    systemDrives.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.Name;
+        opt.textContent = `💾 ${d.Name} (${d.VolumeLabel || 'Disco'}) - ${d.FormattedFree} liberi su ${d.FormattedTotal}`;
+        select.appendChild(opt);
+    });
+
+    if (selectedStorageTarget) {
+        select.value = selectedStorageTarget;
+    }
+
+    // 2. Render Cards
+    container.innerHTML = '';
+    systemDrives.forEach(d => {
+        const card = document.createElement('div');
+        const isSelected = selectedStorageTarget === d.Name;
+        card.className = 'drive-card' + (isSelected ? ' selected' : '');
+        card.onclick = () => selectStorageTarget(d.Name);
+
+        const pct = Math.min(100, Math.max(0, d.UsedPercentage || 0));
+        const barClass = pct > 90 ? ' danger' : (pct > 75 ? ' warn' : '');
+        const iconClass = d.DriveType === 'Removable' ? 'ph-device-mobile' : 'ph-hard-drive';
+
+        card.innerHTML = `
+            <div class="drive-card-header">
+                <div class="drive-card-title">
+                    <i class="ph ${iconClass}"></i>
+                    <span>${d.Name} <small style="font-weight: normal; opacity: 0.8;">(${d.VolumeLabel || 'Disco'})</small></span>
+                </div>
+                <span class="drive-type-badge">${d.DriveFormat || d.DriveType}</span>
+            </div>
+            <div class="drive-bar-bg">
+                <div class="drive-bar-fill${barClass}" style="width: ${pct}%;"></div>
+            </div>
+            <div class="drive-meta">
+                <span>${pct}% usato (${d.FormattedUsed})</span>
+                <span class="drive-free">${d.FormattedFree} liberi</span>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function selectStorageTarget(targetPath) {
+    selectedStorageTarget = targetPath;
+    const select = document.getElementById('storageTargetSelect');
+    if (select) select.value = targetPath;
+
+    document.querySelectorAll('#storageDrivesContainer .drive-card').forEach(card => {
+        const titleText = card.querySelector('.drive-card-title span')?.textContent || '';
+        if (targetPath && titleText.startsWith(targetPath)) {
+            card.classList.add('selected');
+        } else {
+            card.classList.remove('selected');
+        }
+    });
+
+    analyzeStorage();
+}
+
+function onStorageTargetChanged() {
+    const val = document.getElementById('storageTargetSelect')?.value || '';
+    selectedStorageTarget = val;
+    document.querySelectorAll('#storageDrivesContainer .drive-card').forEach(card => {
+        const titleText = card.querySelector('.drive-card-title span')?.textContent || '';
+        if (val && titleText.startsWith(val)) {
+            card.classList.add('selected');
+        } else {
+            card.classList.remove('selected');
+        }
+    });
+}
+
+function renderCleanDrives() {
+    const container = document.getElementById('cleanDrivesContainer');
+    const select = document.getElementById('cleanTargetSelect');
+    if (!container || !select) return;
+
+    // 1. Populate Dropdown
+    select.innerHTML = '';
+    const tempOpt = document.createElement('option');
+    tempOpt.value = 'SYSTEM_TEMP';
+    tempOpt.textContent = '🧹 ' + (translations['systemTemp'] || 'File Temporanei di Sistema & Utente (%TEMP%)');
+    select.appendChild(tempOpt);
+
+    systemDrives.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.Name;
+        opt.textContent = `💾 Unità ${d.Name} (${d.VolumeLabel || 'Disco'}) - ${d.FormattedFree} liberi`;
+        select.appendChild(opt);
+    });
+
+    const activeProfOpt = document.createElement('option');
+    activeProfOpt.value = 'ACTIVE_PROFILE';
+    activeProfOpt.textContent = '📁 ' + (translations['activeProfileFolder'] || 'Cartelle del Profilo Attivo');
+    select.appendChild(activeProfOpt);
+
+    if (selectedCleanTarget) {
+        select.value = selectedCleanTarget;
+    }
+
+    // 2. Render Cards
+    container.innerHTML = '';
+
+    // Card 1: System Temp
+    const tempCard = document.createElement('div');
+    const isTempSelected = selectedCleanTarget === 'SYSTEM_TEMP';
+    tempCard.className = 'drive-card' + (isTempSelected ? ' selected' : '');
+    tempCard.onclick = () => selectCleanTarget('SYSTEM_TEMP');
+    tempCard.innerHTML = `
+        <div class="drive-card-header">
+            <div class="drive-card-title">
+                <i class="ph ph-broom"></i>
+                <span>File Temp di Sistema</span>
+            </div>
+            <span class="drive-type-badge">Windows / User</span>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.3;">
+            %TEMP%, Crash Dumps, cache applicative e file temporanei di sistema.
+        </div>
+        <div class="drive-meta" style="margin-top: auto;">
+            <span class="drive-free">Consigliato per liberare spazio</span>
+        </div>
+    `;
+    container.appendChild(tempCard);
+
+    // Cards for each drive
+    systemDrives.forEach(d => {
+        const card = document.createElement('div');
+        const isSelected = selectedCleanTarget === d.Name;
+        card.className = 'drive-card' + (isSelected ? ' selected' : '');
+        card.onclick = () => selectCleanTarget(d.Name);
+
+        const pct = Math.min(100, Math.max(0, d.UsedPercentage || 0));
+        const barClass = pct > 90 ? ' danger' : (pct > 75 ? ' warn' : '');
+        const iconClass = d.DriveType === 'Removable' ? 'ph-device-mobile' : 'ph-hard-drive';
+
+        card.innerHTML = `
+            <div class="drive-card-header">
+                <div class="drive-card-title">
+                    <i class="ph ${iconClass}"></i>
+                    <span>Unità ${d.Name} <small style="font-weight: normal; opacity: 0.8;">(${d.VolumeLabel || 'Disco'})</small></span>
+                </div>
+                <span class="drive-type-badge">${d.DriveFormat || 'NTFS'}</span>
+            </div>
+            <div class="drive-bar-bg">
+                <div class="drive-bar-fill${barClass}" style="width: ${pct}%;"></div>
+            </div>
+            <div class="drive-meta">
+                <span>${pct}% usato</span>
+                <span class="drive-free">${d.FormattedFree} liberi</span>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function selectCleanTarget(targetPath) {
+    selectedCleanTarget = targetPath;
+    const select = document.getElementById('cleanTargetSelect');
+    if (select) select.value = targetPath;
+
+    document.querySelectorAll('#cleanDrivesContainer .drive-card').forEach((card, idx) => {
+        if (targetPath === 'SYSTEM_TEMP') {
+            if (idx === 0) card.classList.add('selected');
+            else card.classList.remove('selected');
+        } else {
+            const titleText = card.querySelector('.drive-card-title span')?.textContent || '';
+            if (titleText.includes(targetPath)) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+        }
+    });
+}
+
+function onCleanTargetChanged() {
+    const val = document.getElementById('cleanTargetSelect')?.value || 'SYSTEM_TEMP';
+    selectCleanTarget(val);
+}
+
 // --- Storage Analyzer View ---
 function analyzeStorage() {
     const container = document.getElementById('storageReport');
-    if (container) container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:20px;">Analisi dello spazio disco in corso...</div>';
+    if (container) {
+        container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:30px;"><i class="ph ph-circle-notch ph-spin" style="font-size:2rem; margin-bottom:10px; display:block;"></i>Analisi dello spazio disco in corso...</div>';
+    }
+    const target = selectedStorageTarget || document.getElementById('storageTargetSelect')?.value || '';
     if (window.chrome && window.chrome.webview) {
-        window.chrome.webview.postMessage('analyzeStorage');
+        window.chrome.webview.postMessage('analyzeStorage:' + target);
     }
 }
 
@@ -359,26 +582,44 @@ function renderStorage(res) {
     if (!container || !res) return;
     container.innerHTML = '';
 
-    const totalMb = (res.TotalBytes / 1048576).toFixed(1);
+    const rootName = res.RootFolder ? ` su <b>${res.RootFolder}</b>` : '';
+    const totalFormatted = res.FormattedTotalSize || ((res.TotalBytes / 1048576).toFixed(1) + ' MB');
+
     const summaryHeader = document.createElement('div');
-    summaryHeader.innerHTML = `<h3>Totale: ${totalMb} MB in ${res.TotalFiles} file</h3>`;
+    summaryHeader.className = 'glass';
+    summaryHeader.style.padding = '12px 16px';
+    summaryHeader.style.marginBottom = '16px';
+    summaryHeader.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+                <span style="font-size:1.1rem; font-weight:600; color:var(--neon-cyan);">Totale Spazio Scansionato: ${totalFormatted}</span>
+                <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:2px;">Analisi completata${rootName} (${(res.TotalFiles || 0).toLocaleString()} file indicizzati)</div>
+            </div>
+            <button class="btn-action" onclick="analyzeStorage()" style="padding:6px 12px; font-size:0.8rem;"><i class="ph ph-arrows-clockwise"></i> Rianalizza</button>
+        </div>
+    `;
     container.appendChild(summaryHeader);
 
     // Subdirectories bars
     if (res.HeaviestSubdirectories && res.HeaviestSubdirectories.length > 0) {
         const subSec = document.createElement('div');
-        subSec.innerHTML = `<h4 style="margin: 15px 0 8px 0; color:var(--neon-cyan);">Cartelle più pesanti</h4>`;
+        subSec.innerHTML = `<h4 style="margin: 15px 0 10px 0; color:var(--neon-cyan); display:flex; align-items:center; gap:6px;"><i class="ph ph-folder"></i> Cartelle più pesanti</h4>`;
         res.HeaviestSubdirectories.forEach(sub => {
             const barBox = document.createElement('div');
+            barBox.className = 'glass';
+            barBox.style.padding = '8px 12px';
             barBox.style.marginBottom = '8px';
-            const sizeStr = (sub.TotalBytes / 1048576).toFixed(1) + ' MB';
+            const sizeStr = (sub.TotalBytes >= 1073741824) 
+                ? (sub.TotalBytes / 1073741824).toFixed(2) + ' GB' 
+                : (sub.TotalBytes / 1048576).toFixed(1) + ' MB';
+
             barBox.innerHTML = `
-                <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
-                    <span>${sub.Name} (${sub.FileCount} file)</span>
-                    <span>${sizeStr} (${sub.PercentageOfTotal}%)</span>
+                <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:4px;">
+                    <span style="font-weight:600;">📁 ${sub.Name} <small style="color:var(--text-secondary); font-weight:normal;">(${(sub.FileCount || 0).toLocaleString()} file)</small></span>
+                    <span style="color:var(--neon-cyan); font-weight:600;">${sizeStr} (${sub.PercentageOfTotal}%)</span>
                 </div>
-                <div style="background: rgba(255,255,255,0.08); border-radius:4px; height:8px; overflow:hidden; margin-top:2px;">
-                    <div style="background:var(--neon-purple); width:${sub.PercentageOfTotal}%; height:100%;"></div>
+                <div class="drive-bar-bg">
+                    <div style="background:var(--neon-purple); width:${sub.PercentageOfTotal}%; height:100%; border-radius:4px;"></div>
                 </div>
             `;
             subSec.appendChild(barBox);
@@ -386,21 +627,57 @@ function renderStorage(res) {
         container.appendChild(subSec);
     }
 
-    // Top 10 Largest files
+    // Top Largest files
     if (res.TopLargestFiles && res.TopLargestFiles.length > 0) {
         const topSec = document.createElement('div');
-        topSec.innerHTML = `<h4 style="margin: 15px 0 8px 0; color:var(--neon-cyan);">I file più grandi</h4>`;
+        topSec.innerHTML = `<h4 style="margin: 20px 0 10px 0; color:var(--neon-cyan); display:flex; align-items:center; gap:6px;"><i class="ph ph-file-text"></i> I file più grandi</h4>`;
         const ul = document.createElement('ul');
         ul.style.listStyle = 'none';
         ul.style.padding = '0';
-        res.TopLargestFiles.slice(0, 10).forEach(f => {
+        ul.style.display = 'flex';
+        ul.style.flexDirection = 'column';
+        ul.style.gap = '6px';
+
+        res.TopLargestFiles.slice(0, 15).forEach(f => {
             const li = document.createElement('li');
-            li.style.padding = '6px 0';
-            li.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            li.className = 'glass';
+            li.style.padding = '8px 12px';
             li.style.display = 'flex';
             li.style.justifyContent = 'space-between';
+            li.style.alignItems = 'center';
             li.style.fontSize = '0.85rem';
-            li.innerHTML = `<span>${f.Name}</span><span style="color:var(--neon-cyan);">${f.FormattedSize}</span>`;
+
+            const leftDiv = document.createElement('div');
+            leftDiv.style.flex = '1';
+            leftDiv.style.overflow = 'hidden';
+            leftDiv.style.textOverflow = 'ellipsis';
+            leftDiv.style.whiteSpace = 'nowrap';
+            leftDiv.style.marginRight = '12px';
+            leftDiv.innerHTML = `<span style="font-weight:600;">${f.Name}</span><div style="font-size:0.75rem; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis;">${f.Path}</div>`;
+
+            const rightDiv = document.createElement('div');
+            rightDiv.style.display = 'flex';
+            rightDiv.style.alignItems = 'center';
+            rightDiv.style.gap = '10px';
+
+            const sizeSpan = document.createElement('span');
+            sizeSpan.style.color = 'var(--neon-cyan)';
+            sizeSpan.style.fontWeight = '600';
+            sizeSpan.textContent = f.FormattedSize;
+
+            const btnReveal = document.createElement('button');
+            btnReveal.className = 'btn-action';
+            btnReveal.style.padding = '4px 8px';
+            btnReveal.style.fontSize = '0.75rem';
+            btnReveal.title = translations['revealInExplorer'] || 'Mostra in Esplora Risorse';
+            btnReveal.innerHTML = '<i class="ph ph-folder-open"></i>';
+            btnReveal.onclick = () => revealFile(f.Path);
+
+            rightDiv.appendChild(sizeSpan);
+            rightDiv.appendChild(btnReveal);
+
+            li.appendChild(leftDiv);
+            li.appendChild(rightDiv);
             ul.appendChild(li);
         });
         topSec.appendChild(ul);
@@ -410,123 +687,353 @@ function renderStorage(res) {
 
 // --- Cleanup View ---
 function scanJunk() {
+    currentCleanMode = 'junk';
     const container = document.getElementById('cleanupList');
-    if (container) container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:20px;">Ricerca file spazzatura in corso...</div>';
+    if (container) {
+        container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:30px;"><i class="ph ph-circle-notch ph-spin" style="font-size:2rem; margin-bottom:10px; display:block;"></i>Ricerca file temporanei e spazzatura in corso...</div>';
+    }
+    const target = selectedCleanTarget || document.getElementById('cleanTargetSelect')?.value || 'SYSTEM_TEMP';
     if (window.chrome && window.chrome.webview) {
-        window.chrome.webview.postMessage('scanJunk');
+        window.chrome.webview.postMessage('scanJunk:' + target);
     }
 }
 
 function scanInstallers() {
+    currentCleanMode = 'installers';
     const container = document.getElementById('cleanupList');
-    if (container) container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:20px;">Ricerca installer vecchi in corso...</div>';
+    if (container) {
+        container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:30px;"><i class="ph ph-circle-notch ph-spin" style="font-size:2rem; margin-bottom:10px; display:block;"></i>Ricerca pacchetti installer in corso...</div>';
+    }
+    const target = selectedCleanTarget || document.getElementById('cleanTargetSelect')?.value || '';
     if (window.chrome && window.chrome.webview) {
-        window.chrome.webview.postMessage('cleanInstallers');
+        window.chrome.webview.postMessage('cleanInstallers:' + target);
+    }
+}
+
+function executeCleanSelected() {
+    if (currentCleanMode === 'installers') {
+        recycleInstallers();
+    } else {
+        recycleJunk();
     }
 }
 
 function renderJunk(items) {
     junkData = items || [];
+    currentCleanMode = 'junk';
     const container = document.getElementById('cleanupList');
     if (!container) return;
     container.innerHTML = '';
 
+    const btnCleanToolbar = document.getElementById('btnCleanAction');
+    const lblCleanToolbar = document.getElementById('lblCleanAction');
+
     if (junkData.length === 0) {
-        container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding:20px;">Nessun file temporaneo o vuoto rilevato!</div>';
+        container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding:30px;"><i class="ph ph-check-circle" style="font-size:2.5rem; color:var(--neon-cyan); display:block; margin-bottom:8px;"></i>Nessun file temporaneo o vuoto rilevato nella posizione selezionata! Il sistema è pulito.</div>';
+        if (lblCleanToolbar) lblCleanToolbar.textContent = translations['deleteSelected'] || 'Cancella Selezionati';
         return;
     }
 
+    if (lblCleanToolbar) lblCleanToolbar.textContent = `Cancella Selezionati (${junkData.length})`;
+
+    // Calculate total bytes
+    let totalBytes = 0;
+    junkData.forEach(item => { totalBytes += (item.Bytes || 0); });
+    const formattedBytes = formatByteSize(totalBytes);
+
     const header = document.createElement('div');
+    header.className = 'glass';
+    header.style.padding = '12px 16px';
+    header.style.marginBottom = '12px';
     header.style.display = 'flex';
     header.style.justifyContent = 'space-between';
-    header.style.marginBottom = '12px';
-    header.innerHTML = `<span>Trovati <b>${junkData.length}</b> file spazzatura</span><button class="btn-action" onclick="recycleJunk()"><i class="ph ph-trash"></i> Cestina Selezionati</button>`;
+    header.style.alignItems = 'center';
+    header.style.flexWrap = 'wrap';
+    header.style.gap = '10px';
+
+    header.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+            <label style="display:flex; align-items:center; gap:6px; font-weight:600; cursor:pointer;">
+                <input type="checkbox" id="chkSelectAllJunk" checked onchange="toggleSelectAllJunk(this.checked)">
+                <span>Seleziona tutti</span>
+            </label>
+            <span style="font-size:0.9rem;">Trovati <b style="color:var(--neon-cyan);">${junkData.length}</b> file temporanei (<b style="color:#ff6b6b;">${formattedBytes}</b> recuperabili)</span>
+        </div>
+        <button class="btn-undo" onclick="recycleJunk()" style="font-weight:600;">
+            <i class="ph ph-trash"></i> <span>Elimina File Selezionati</span>
+        </button>
+    `;
     container.appendChild(header);
 
-    junkData.forEach(item => {
+    const listDiv = document.createElement('div');
+    listDiv.style.display = 'flex';
+    listDiv.style.flexDirection = 'column';
+    listDiv.style.gap = '6px';
+
+    junkData.forEach((item, index) => {
         const row = document.createElement('div');
         row.className = 'glass';
-        row.style.padding = '8px 12px';
-        row.style.marginBottom = '6px';
+        row.style.padding = '10px 14px';
         row.style.display = 'flex';
         row.style.alignItems = 'center';
-        row.style.gap = '10px';
+        row.style.gap = '12px';
 
         const chk = document.createElement('input');
         chk.type = 'checkbox';
-        chk.checked = item.SelectedForRecycle;
-        chk.onchange = () => { item.SelectedForRecycle = chk.checked; };
+        chk.checked = item.SelectedForRecycle !== false;
+        chk.onchange = () => {
+            item.SelectedForRecycle = chk.checked;
+            updateJunkHeaderTotal();
+        };
 
-        const span = document.createElement('span');
-        span.style.flex = '1';
-        span.style.fontSize = '0.85rem';
-        span.textContent = `${item.Path} (${item.Reason})`;
+        const infoDiv = document.createElement('div');
+        infoDiv.style.flex = '1';
+        infoDiv.style.overflow = 'hidden';
+
+        const titleRow = document.createElement('div');
+        titleRow.style.display = 'flex';
+        titleRow.style.alignItems = 'center';
+        titleRow.style.gap = '8px';
+        titleRow.style.fontSize = '0.88rem';
+
+        const fileName = item.FileName || (item.Path ? item.Path.split(/[\\/]/).pop() : 'File');
+        const reasonBadge = `<span style="font-size:0.7rem; padding:2px 6px; border-radius:4px; background:rgba(255,100,100,0.15); color:#ff6b6b; font-weight:600;">${item.Reason}</span>`;
+
+        titleRow.innerHTML = `<span style="font-weight:600;">${fileName}</span> ${reasonBadge}`;
+
+        const pathDiv = document.createElement('div');
+        pathDiv.style.fontSize = '0.75rem';
+        pathDiv.style.color = 'var(--text-secondary)';
+        pathDiv.style.overflow = 'hidden';
+        pathDiv.style.textOverflow = 'ellipsis';
+        pathDiv.style.whiteSpace = 'nowrap';
+        pathDiv.textContent = item.Path;
+
+        infoDiv.appendChild(titleRow);
+        infoDiv.appendChild(pathDiv);
+
+        const sizeSpan = document.createElement('span');
+        sizeSpan.style.fontSize = '0.85rem';
+        sizeSpan.style.color = 'var(--neon-cyan)';
+        sizeSpan.style.fontWeight = '600';
+        sizeSpan.style.whiteSpace = 'nowrap';
+        sizeSpan.textContent = item.FormattedSize || formatByteSize(item.Bytes || 0);
 
         row.appendChild(chk);
-        row.appendChild(span);
-        container.appendChild(row);
+        row.appendChild(infoDiv);
+        row.appendChild(sizeSpan);
+        listDiv.appendChild(row);
     });
+
+    container.appendChild(listDiv);
+}
+
+function toggleSelectAllJunk(checked) {
+    junkData.forEach(item => { item.SelectedForRecycle = checked; });
+    const container = document.getElementById('cleanupList');
+    if (container) {
+        container.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+            chk.checked = checked;
+        });
+    }
+    updateJunkHeaderTotal();
+}
+
+function updateJunkHeaderTotal() {
+    const selected = junkData.filter(i => i.SelectedForRecycle);
+    const lblCleanToolbar = document.getElementById('lblCleanAction');
+    if (lblCleanToolbar) {
+        lblCleanToolbar.textContent = `Cancella Selezionati (${selected.length})`;
+    }
 }
 
 function recycleJunk() {
-    if (junkData.length === 0) return;
-    if (confirm("Spostare i file spazzatura selezionati nel Cestino?")) {
+    const selected = junkData.filter(i => i.SelectedForRecycle);
+    if (selected.length === 0) {
+        alert("Nessun file selezionato per l'eliminazione.");
+        return;
+    }
+
+    let totalBytes = 0;
+    selected.forEach(i => { totalBytes += (i.Bytes || 0); });
+    const formattedBytes = formatByteSize(totalBytes);
+
+    if (confirm(`Eliminare i ${selected.length} file temporanei selezionati liberando circa ${formattedBytes}?\n\nI file verranno rimossi in sicurezza.`)) {
+        const container = document.getElementById('cleanupList');
+        if (container) {
+            container.innerHTML = '<div style="text-align:center; color:var(--neon-cyan); padding:30px;"><i class="ph ph-circle-notch ph-spin" style="font-size:2rem; margin-bottom:10px; display:block;"></i>Eliminazione file in corso...</div>';
+        }
         if (window.chrome && window.chrome.webview) {
-            window.chrome.webview.postMessage('recycleJunk:' + JSON.stringify(junkData));
+            window.chrome.webview.postMessage('recycleJunk:' + JSON.stringify(selected));
         }
     }
+}
+
+function onJunkCleaned(res) {
+    const container = document.getElementById('cleanupList');
+    if (!container) return;
+    const count = res.Count || res.count || 0;
+    const freed = res.FormattedBytes || res.formattedBytes || '0 B';
+
+    container.innerHTML = `
+        <div class="clean-success-banner">
+            <i class="ph ph-check-circle"></i>
+            <div>
+                <b style="font-size:1rem;">Pulizia completata con successo!</b>
+                <div style="margin-top:2px; font-size:0.85rem;">Eliminati <b>${count}</b> file temporanei, liberando <b>${freed}</b> di spazio su disco.</div>
+            </div>
+        </div>
+        <div style="text-align:center; padding:20px;">
+            <button class="btn-action" onclick="scanJunk()"><i class="ph ph-arrows-clockwise"></i> Esegui un'altra scansione</button>
+        </div>
+    `;
+
+    junkData = [];
+    const lblCleanToolbar = document.getElementById('lblCleanAction');
+    if (lblCleanToolbar) lblCleanToolbar.textContent = translations['deleteSelected'] || 'Cancella Selezionati';
+    loadDrives();
 }
 
 function renderInstallers(items) {
     installersData = items || [];
+    currentCleanMode = 'installers';
     const container = document.getElementById('cleanupList');
     if (!container) return;
     container.innerHTML = '';
 
+    const lblCleanToolbar = document.getElementById('lblCleanAction');
+
     if (installersData.length === 0) {
-        container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding:20px;">Nessun installer vecchio o duplicato rilevato.</div>';
+        container.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding:30px;"><i class="ph ph-check-circle" style="font-size:2.5rem; color:var(--neon-cyan); display:block; margin-bottom:8px;"></i>Nessun installer vecchio o duplicato rilevato.</div>';
+        if (lblCleanToolbar) lblCleanToolbar.textContent = translations['deleteSelected'] || 'Cancella Selezionati';
         return;
     }
 
+    if (lblCleanToolbar) lblCleanToolbar.textContent = `Cancella Installer (${installersData.length})`;
+
+    let totalBytes = 0;
+    installersData.forEach(item => { if (item.SelectedForRecycle) totalBytes += (item.Bytes || 0); });
+
     const header = document.createElement('div');
+    header.className = 'glass';
+    header.style.padding = '12px 16px';
+    header.style.marginBottom = '12px';
     header.style.display = 'flex';
     header.style.justifyContent = 'space-between';
-    header.style.marginBottom = '12px';
-    header.innerHTML = `<span>Rilevati <b>${installersData.length}</b> pacchetti installer</span><button class="btn-action" onclick="recycleInstallers()"><i class="ph ph-trash"></i> Cestina Selezionati</button>`;
+    header.style.alignItems = 'center';
+    header.style.flexWrap = 'wrap';
+    header.style.gap = '10px';
+
+    header.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+            <label style="display:flex; align-items:center; gap:6px; font-weight:600; cursor:pointer;">
+                <input type="checkbox" id="chkSelectAllInstallers" checked onchange="toggleSelectAllInstallers(this.checked)">
+                <span>Seleziona tutti</span>
+            </label>
+            <span style="font-size:0.9rem;">Rilevati <b style="color:var(--neon-cyan);">${installersData.length}</b> installer (<b style="color:#ff6b6b;">${formatByteSize(totalBytes)}</b> selezionati)</span>
+        </div>
+        <button class="btn-undo" onclick="recycleInstallers()" style="font-weight:600;">
+            <i class="ph ph-trash"></i> <span>Cestina Installer Selezionati</span>
+        </button>
+    `;
     container.appendChild(header);
+
+    const listDiv = document.createElement('div');
+    listDiv.style.display = 'flex';
+    listDiv.style.flexDirection = 'column';
+    listDiv.style.gap = '6px';
 
     installersData.forEach(item => {
         const row = document.createElement('div');
         row.className = 'glass';
-        row.style.padding = '8px 12px';
-        row.style.marginBottom = '6px';
+        row.style.padding = '10px 14px';
         row.style.display = 'flex';
         row.style.alignItems = 'center';
-        row.style.gap = '10px';
+        row.style.gap = '12px';
 
         const chk = document.createElement('input');
         chk.type = 'checkbox';
         chk.checked = item.SelectedForRecycle;
         chk.onchange = () => { item.SelectedForRecycle = chk.checked; };
 
-        const tag = item.IsOlderVersion ? '<span style="color:#ff6464; font-size:0.75rem;">[Versione Vecchia]</span>' : '';
-        const span = document.createElement('span');
+        const tag = item.IsOlderVersion ? '<span style="color:#ff6464; font-size:0.75rem; font-weight:600; background:rgba(255,100,100,0.15); padding:2px 6px; border-radius:4px;">[Versione Vecchia]</span>' : '';
+        const span = document.createElement('div');
         span.style.flex = '1';
         span.style.fontSize = '0.85rem';
-        span.innerHTML = `${item.FileName} ${tag} <span style="color:var(--text-secondary); font-size:0.75rem;">(${new Date(item.LastModified).toLocaleDateString()})</span>`;
+        span.innerHTML = `<span style="font-weight:600;">${item.FileName}</span> ${tag} <div style="color:var(--text-secondary); font-size:0.75rem;">${item.Path} (${new Date(item.LastModified).toLocaleDateString()})</div>`;
+
+        const sizeSpan = document.createElement('span');
+        sizeSpan.style.color = 'var(--neon-cyan)';
+        sizeSpan.style.fontWeight = '600';
+        sizeSpan.style.fontSize = '0.85rem';
+        sizeSpan.textContent = formatByteSize(item.Bytes || 0);
 
         row.appendChild(chk);
         row.appendChild(span);
-        container.appendChild(row);
+        row.appendChild(sizeSpan);
+        listDiv.appendChild(row);
     });
+    container.appendChild(listDiv);
+}
+
+function toggleSelectAllInstallers(checked) {
+    installersData.forEach(item => { item.SelectedForRecycle = checked; });
+    const container = document.getElementById('cleanupList');
+    if (container) {
+        container.querySelectorAll('input[type="checkbox"]').forEach(chk => { chk.checked = checked; });
+    }
 }
 
 function recycleInstallers() {
-    if (installersData.length === 0) return;
-    if (confirm("Spostare gli installer selezionati nel Cestino?")) {
+    const selected = installersData.filter(i => i.SelectedForRecycle);
+    if (selected.length === 0) {
+        alert("Nessun installer selezionato.");
+        return;
+    }
+    if (confirm(`Spostare i ${selected.length} pacchetti installer selezionati nel Cestino?`)) {
         if (window.chrome && window.chrome.webview) {
-            window.chrome.webview.postMessage('recycleInstallers:' + JSON.stringify(installersData));
+            window.chrome.webview.postMessage('recycleInstallers:' + JSON.stringify(selected));
         }
+    }
+}
+
+function onInstallersCleaned(res) {
+    const container = document.getElementById('cleanupList');
+    if (!container) return;
+    const count = res.Count || res.count || 0;
+    const freed = res.FormattedBytes || res.formattedBytes || '0 B';
+
+    container.innerHTML = `
+        <div class="clean-success-banner">
+            <i class="ph ph-check-circle"></i>
+            <div>
+                <b style="font-size:1rem;">Pulizia installer completata!</b>
+                <div style="margin-top:2px; font-size:0.85rem;">Spostati nel Cestino <b>${count}</b> pacchetti installer, liberando <b>${freed}</b>.</div>
+            </div>
+        </div>
+        <div style="text-align:center; padding:20px;">
+            <button class="btn-action" onclick="scanInstallers()"><i class="ph ph-arrows-clockwise"></i> Scansiona di nuovo</button>
+        </div>
+    `;
+
+    installersData = [];
+    const lblCleanToolbar = document.getElementById('lblCleanAction');
+    if (lblCleanToolbar) lblCleanToolbar.textContent = translations['deleteSelected'] || 'Cancella Selezionati';
+    loadDrives();
+}
+
+function formatByteSize(bytes) {
+    if (!bytes || bytes <= 0) return '0 B';
+    if (bytes >= 1099511627776) return (bytes / 1099511627776).toFixed(2) + ' TB';
+    if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return bytes + ' B';
+}
+
+function revealFile(filePath) {
+    if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage('revealFile:' + filePath);
     }
 }
 
@@ -663,14 +1170,23 @@ function handleMessage(msg) {
         case 'duplicatesData':
             renderDuplicates(payload);
             break;
+        case 'drivesData':
+            renderDrives(payload);
+            break;
         case 'storageData':
             renderStorage(payload);
             break;
         case 'junkData':
             renderJunk(payload);
             break;
+        case 'junkCleaned':
+            onJunkCleaned(payload);
+            break;
         case 'installerData':
             renderInstallers(payload);
+            break;
+        case 'installersCleaned':
+            onInstallersCleaned(payload);
             break;
         case 'whereDidItGoResults':
             renderHistory(payload);
